@@ -38,7 +38,7 @@ Both run entirely in the browser: files never leave your device, there is no ser
 
 ### Removing objects (no AI)
 
-Select a person or object (the Lasso is easiest; include a little background around it), select the photo layer and click **Remove object**. The area is rebuilt from similar patches found around it using **PatchMatch**, the same non-AI technique behind Photoshop's original Content-Aware Fill. It runs entirely in your browser in a background worker, usually in a second or two.
+Select a person or object (the Lasso is easiest; include a little background around it), select the photo layer and click **Remove object**. The area is rebuilt from similar patches found around it using **PatchMatch**, the same non-AI technique behind Photoshop's original Content-Aware Fill. It runs entirely in your browser in a background worker: about a second for a person in a normal photo and a few seconds for a large object in a full-size phone photo. A Cancel button stops a long removal. The result stays at full resolution and is built from real pixels of the photo, so it isn't blurred or stretched.
 
 It works best on textures and backgrounds: sky, water, sand, grass, walls, roads. Large objects in front of detailed or structured backgrounds (faces, text, straight architectural lines) can come out smudged or repeated. Ctrl+Z undoes it, and you can run it again on a smaller area.
 

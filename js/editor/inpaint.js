@@ -88,18 +88,17 @@
     function distance(lv, t, s, best) {
       var w = lv.w, h = lv.h, img = lv.img;
       var tx = t % w, ty = (t / w) | 0, sx = s % w, sy = (s / w) | 0, sum = 0;
-      for (var dy = -R; dy <= R; dy++) {
-        var y = ty + dy;
-        if (y < 0 || y >= h) continue;
-        var trow = y * w, srow = (sy + dy) * w;
-        for (var dx = -R; dx <= R; dx++) {
-          var x = tx + dx;
-          if (x < 0 || x >= w) continue;
-          var ti = (trow + x) * 4, si = (srow + sx + dx) * 4;
+      // Clip the patch to the image once (the source patch is always fully inside).
+      var dx0 = tx - R < 0 ? -tx : -R, dx1 = tx + R >= w ? w - 1 - tx : R;
+      var dy0 = ty - R < 0 ? -ty : -R, dy1 = ty + R >= h ? h - 1 - ty : R;
+      var step = (dx1 - dx0 + 1) * 4;
+      for (var dy = dy0; dy <= dy1; dy++) {
+        var ti = ((ty + dy) * w + tx + dx0) * 4, si = ((sy + dy) * w + sx + dx0) * 4, end = ti + step;
+        for (; ti < end; ti += 4, si += 4) {
           var d0 = img[ti] - img[si], d1 = img[ti + 1] - img[si + 1], d2 = img[ti + 2] - img[si + 2];
           sum += d0 * d0 + d1 * d1 + d2 * d2;
-          if (sum >= best) return sum;
         }
+        if (sum >= best) return sum; // early exit once this candidate can't win
       }
       return sum;
     }
@@ -226,7 +225,16 @@
       if (!levels[0].sources.length) throw new Error('Not enough of the photo around the selection to rebuild it from.');
 
       var totalWork = 0, done = 0;
-      levels.forEach(function (lv, i) { lv.iters = i === levels.length - 1 ? 6 : i === 0 ? 2 : 4; totalWork += lv.iters * lv.targets.length; });
+      // Coarse levels decide the structure and get the most iterations. Large fine levels inherit
+      // good matches from below, so they need fewer passes and only a local search to refine them.
+      levels.forEach(function (lv, i) {
+        var n = lv.targets.length, coarsest = i === levels.length - 1;
+        if (coarsest) { lv.iters = 6; lv.passes = 3; lv.radius = Math.max(lv.w, lv.h); }
+        else if (n < 20000) { lv.iters = i === 0 ? 2 : 4; lv.passes = 2; lv.radius = Math.max(4, Math.max(lv.w, lv.h) >> 2); }
+        else if (n < 120000) { lv.iters = 2; lv.passes = 2; lv.radius = 24; }
+        else { lv.iters = 1; lv.passes = 2; lv.radius = 12; }
+        totalWork += lv.iters * n;
+      });
 
       for (var li = levels.length - 1; li >= 0; li--) {
         var lv = levels[li];
@@ -249,9 +257,8 @@
           lv.nnf[t] = s >= 0 ? s : randomSource(lv);
         }
         if (coarser) vote(lv); else onionFill(lv);
-        var radius = coarser ? Math.max(4, Math.max(lv.w, lv.h) >> 2) : Math.max(lv.w, lv.h);
         for (var it = 0; it < lv.iters; it++) {
-          patchMatch(lv, coarser ? 2 : 3, radius);
+          patchMatch(lv, lv.passes, lv.radius);
           vote(lv);
           done += lv.targets.length;
           if (progress) progress(done / totalWork);
@@ -291,20 +298,36 @@
     });
   }
 
+  var cancelActive = null;
+
+  // Stops the running removal (only possible when it runs in a worker).
+  function cancel() {
+    if (cancelActive) cancelActive();
+  }
+
   function run(rgba, hole, w, h, onProgress) {
     var worker;
     try { worker = makeWorker(); } catch (e) { return runInPage(rgba, hole, w, h, onProgress); }
     return new Promise(function (resolve, reject) {
       var started = false;
+      cancelActive = function () {
+        cancelActive = null;
+        worker.terminate();
+        var err = new Error('Cancelled');
+        err.cancelled = true;
+        reject(err);
+      };
       worker.onmessage = function (e) {
         started = true;
         if (e.data.progress !== undefined) { if (onProgress) onProgress(e.data.progress); return; }
+        cancelActive = null;
         worker.terminate();
         if (e.data.error) reject(new Error(e.data.error));
         else resolve(e.data.rgba);
       };
       worker.onerror = function (e) {
         e.preventDefault();
+        cancelActive = null;
         worker.terminate();
         // Some browsers block workers on pages opened from disk; fall back to the page itself.
         if (!started) runInPage(rgba, hole, w, h, onProgress).then(resolve, reject);
@@ -314,5 +337,5 @@
     });
   }
 
-  global.Inpaint = { run: run, core: factory };
+  global.Inpaint = { run: run, cancel: cancel, core: factory };
 })(window);

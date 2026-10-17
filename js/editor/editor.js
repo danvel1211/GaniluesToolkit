@@ -1363,7 +1363,7 @@
       replacePixels(l, function (ctx) { ctx.putImageData(new ImageData(out, rw, rh), rx, ry); });
       toast('Object removed in ' + ((Date.now() - started) / 1000).toFixed(1) + 's. Ctrl+Z to undo.');
     }, function (err) {
-      toast('Couldn\'t remove it: ' + err.message);
+      toast(err.cancelled ? 'Removal cancelled.' : 'Couldn\'t remove it: ' + err.message);
     }).then(function () { setBusy(null); });
   }
 
@@ -1967,6 +1967,7 @@
     $('sel-crop').onclick = cropToSelection;
     $('sel-invert').onclick = invertSelection;
     $('sel-clear').onclick = clearSelection;
+    $('busy-cancel').onclick = function () { Inpaint.cancel(); };
     $('crop-apply').onclick = applyCrop;
     $('crop-cancel').onclick = cancelCrop;
     $('zoom-in').onclick = function () { zoomAt(1.25); };
