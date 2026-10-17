@@ -32,9 +32,9 @@
     "package": {
       "folder": "resources",
       "rootFiles": {
-        "Studiolo.exe": "brands/studiolo/Studiolo.exe",
         "Studiolo.html": "brands/studiolo/launcher.html",
-        "Read Me.txt": "brands/studiolo/Read Me.txt"
+        "Read Me.txt": "brands/studiolo/Read Me.txt",
+        "Add Studiolo to Desktop.cmd": "brands/studiolo/Add Studiolo to Desktop.cmd"
       }
     }
   }

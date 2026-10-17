@@ -3,20 +3,22 @@ Private file tools that run in your browser.
 Created by Daniel Velasquez · danvel1211@gmail.com
 
 HOW TO OPEN
-  Windows:        double-click Studiolo.exe
-  Mac or Linux:   double-click Studiolo.html
+  Double-click Studiolo.html. Studiolo opens in your web browser.
+  Nothing is installed, nothing is uploaded, and it works without
+  an internet connection.
 
-Studiolo opens in your web browser. Nothing is installed, nothing is
-uploaded, and it works without an internet connection.
+ADD STUDIOLO WITH ITS ICON (WINDOWS, OPTIONAL)
+  Double-click "Add Studiolo to Desktop.cmd" once. It adds a Studiolo
+  shortcut with the Studiolo icon to your Desktop and Start menu, and
+  gives this folder the Studiolo icon. It doesn't install or download
+  anything; you can open it in Notepad to see exactly what it does.
+  If Windows asks whether to run it, choose "Run" (or "More info" >
+  "Run anyway"). If you move the Studiolo folder, run it again.
 
-Keep the "resources" folder next to Studiolo.exe and Studiolo.html.
-They need it to start.
+  Studiolo.html itself shows your browser's icon: Windows uses the
+  browser's icon for every .html file.
 
-FIRST TIME ON WINDOWS
-Windows may show "Windows protected your PC" the first time, because
-Studiolo.exe is new and not yet signed with a publisher certificate.
-Click "More info", then "Run anyway". You can also open Studiolo.html
-instead; it starts exactly the same app.
+Keep the "resources" folder next to Studiolo.html. Studiolo needs it.
 
 WHAT'S INSIDE
   File combination   merge PDFs and images, arrange pages

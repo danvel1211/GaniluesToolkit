@@ -24,19 +24,13 @@ The same app ships under two brands, listed in `brands/editions.json`:
 
 ```
 Studiolo/
-├── Studiolo.exe    Windows launcher with the Studiolo icon
-├── Studiolo.html   launcher for Mac/Linux (redirects into the app)
+├── Studiolo.html                 opens the app
+├── Add Studiolo to Desktop.cmd   optional Windows setup for the icon
 ├── Read Me.txt
-└── resources/      the app itself
+└── resources/                    the app itself
 ```
 
-`Studiolo.exe` is a tiny program (source in `brands/studiolo/launcher/main.go`) that opens `resources/index.html` in the default browser. It carries the app icon (`brands/studiolo/Studiolo.ico`, designed in `app-icon.svg`) and version details (Studiolo 1.0.0, © 2026 Daniel Velasquez). It isn't code-signed, so Windows SmartScreen may warn the first time it's opened; signing it needs a code-signing certificate. To rebuild it after changing the icon or code (requires Go and [go-winres](https://github.com/tc-hib/go-winres)):
-
-```
-cd brands/studiolo/launcher
-go-winres simply --icon ../Studiolo.ico --manifest gui --product-name Studiolo --file-description Studiolo --product-version 1.0.0.0 --file-version 1.0.0.0 --copyright "© 2026 Daniel Velasquez" --original-filename Studiolo.exe --arch amd64
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-H windowsgui -s -w" -o ../Studiolo.exe .
-```
+An `.html` file always shows the default browser's icon on Windows, so the Studiolo icon (`brands/studiolo/Studiolo.ico`, designed in `app-icon.svg`) is applied by `Add Studiolo to Desktop.cmd`. Run once, it creates Desktop and Start-menu shortcuts to `Studiolo.html` with the icon and gives the folder the icon via a hidden `desktop.ini`. It's a plain-text script that installs and downloads nothing. Inside the app, the icon is also the browser-tab icon.
 
 Studiolo also has an **About** page (`brands/studiolo/about.html`, with `about.css` and `about.js`) crediting its creator, Daniel Velasquez. It's linked from every Studiolo page and the home screen. Pages and links that belong to one edition are listed under `extraFiles` and `navLinks` in `brands/editions.json`.
 
