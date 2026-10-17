@@ -274,3 +274,4 @@
   .js .reveal { opacity: 1; transform: none; transition: none; }
   .glass, .feature { transition: none; }
 }
+.has-dock.about-page .topbar { position: relative; }

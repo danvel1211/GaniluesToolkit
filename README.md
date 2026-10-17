@@ -7,9 +7,10 @@ Off the Clock Creative Suite is a set of standalone web tools for working with f
 - **File combination** (`pdf.html`): merge PDFs and images into one PDF, arrange, rotate, duplicate and delete pages, or extract selected pages.
 - **Fill & sign PDF** (`sign.html`): fill in PDF forms, detect blank fields in ordinary PDFs, add text, dates, ticks and white-out, and sign with a drawn, typed or uploaded signature.
 - **Edit image** (`editor.html`): a layer-based image editor with selections, object removal, filters, painting, text, shapes and crop.
+- **Collage maker** (`collage.html`): photo collages and grids with 16 layouts, adjustable spacing, borders and rounded corners, drag to swap or reposition photos, and export for social media or print (PNG, JPEG, WebP, PDF).
 - **File converter** (`converter.html`): convert, view, inspect and resize images, one at a time or in batches.
 
-Everything runs in the browser, works offline, and has a light and a dark theme (dark by default; the switch is in every header).
+Everything runs in the browser, works offline, and has a light and a dark theme (dark by default; the switch is in every header). A floating tool switcher at the top of every page jumps between the tools.
 
 ## Editions
 
@@ -183,6 +184,10 @@ css/styles.css      Shared styling and light/dark themes
 css/pdf.css         File combination styling
 js/theme.js         Applies the saved theme before the page paints
 js/theme-toggle.js  Light/dark switch
+js/dock.js          Floating tool switcher at the top of every page
+collage.html        Collage maker page
+css/collage.css     Collage maker styling
+js/collage.js       Collage layouts, editing and export
 js/pdf/combine.js   File combination logic
 sign.html           Fill & sign page
 css/sign.css        Fill & sign styling
