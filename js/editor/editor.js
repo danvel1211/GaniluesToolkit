@@ -35,6 +35,8 @@
     lineWeight: 8,
     starPoints: 5,
     editing: null, // text layer being typed into on the canvas
+    selection: null, // { canvas, bits, bbox, edges } in document pixels
+    busy: false,
     crop: null,
     op: null, // active pointer operation
     hover: null, // pointer position in document coords
@@ -230,6 +232,8 @@
       }
     }
 
+    drawSelectionOverlay();
+
     if (state.tool === 'crop' && state.crop) {
       var a = toScreen({ x: state.crop.x, y: state.crop.y });
       var w = state.crop.w * state.zoom, h = state.crop.h * state.zoom;
@@ -291,6 +295,7 @@
   }
 
   function restore(snap) {
+    if (state.selection && snap.doc && (snap.doc.w !== state.doc.w || snap.doc.h !== state.doc.h)) clearSelection();
     state.doc = snap.doc ? { w: snap.doc.w, h: snap.doc.h, background: snap.doc.background } : null;
     state.layers = snap.layers.map(Layers.clone);
     state.selectedId = snap.selectedId;
@@ -317,6 +322,8 @@
     state.layers = [];
     state.selectedId = null;
     state.crop = null;
+    state.selection = null;
+    updateSelectionUi();
     state.history = [];
     state.hIndex = -1;
     $('start-screen').hidden = true;
@@ -499,7 +506,7 @@
   var PAINT_TOOLS = ['brush', 'pencil', 'spray', 'eraser'];
 
   function onPointerDown(e) {
-    if (!state.doc || state.op) return;
+    if (!state.doc || state.op || state.busy) return;
     if (e.button === 2) return;
     var tool = state.tool;
     // Clicking the canvas while typing finishes the text (and doesn't start a new one).
@@ -530,6 +537,12 @@
       } else {
         select(null);
       }
+    } else if (tool === 'marquee-rect' || tool === 'marquee-ellipse') {
+      state.op = { type: 'select', kind: tool, p0: p, p1: null, mode: selectionMode(e) };
+    } else if (tool === 'lasso') {
+      state.op = { type: 'lasso', points: [p], mode: selectionMode(e) };
+    } else if (tool === 'wand') {
+      wandSelect(p, selectionMode(e));
     } else if (PAINT_TOOLS.indexOf(tool) >= 0) {
       startPaint(p, tool);
     } else if (tool === 'bucket' || tool === 'magic-eraser') {
@@ -605,6 +618,14 @@
       op.changed = true;
       requestRender();
       renderProps();
+    } else if (op.type === 'select') {
+      op.p1 = p;
+      op.square = e.shiftKey && op.mode === 'new';
+      requestRender();
+    } else if (op.type === 'lasso') {
+      var last = op.points[op.points.length - 1];
+      if (Math.hypot(p.x - last.x, p.y - last.y) * state.zoom >= 2) op.points.push(p);
+      requestRender();
     } else if (op.type === 'paint') {
       paintTo(p);
     } else if (op.type === 'gradient') {
@@ -629,6 +650,7 @@
     if ((op.type === 'move' || op.type === 'scale' || op.type === 'rotate') && op.changed) commit();
     else if (op.type === 'paint') endPaint(op);
     else if (op.type === 'gradient') endGradient(op);
+    else if (op.type === 'select' || op.type === 'lasso') finishSelectionDrag(op);
     else if (op.type === 'shape' && op.layer) commit();
     requestRender();
   }
@@ -1013,6 +1035,338 @@
     if (state.editing) textEditor.focus();
   }
 
+  /* ---------- selections ---------- */
+
+  var SELECT_TOOLS = ['marquee-rect', 'marquee-ellipse', 'lasso', 'wand'];
+
+  function selectionMode(e) {
+    return e.shiftKey ? 'add' : e.altKey ? 'subtract' : 'new';
+  }
+
+  // Combines a newly drawn shape with the current selection. The mask is a document-sized canvas.
+  function applySelection(draw, mode) {
+    var d = state.doc, c = newCanvas(d.w, d.h), ctx = c.getContext('2d');
+    if (mode !== 'new' && state.selection) ctx.drawImage(state.selection.canvas, 0, 0);
+    ctx.globalCompositeOperation = mode === 'subtract' ? 'destination-out' : 'source-over';
+    ctx.fillStyle = '#000';
+    draw(ctx);
+    setSelectionCanvas(c);
+  }
+
+  function setSelectionCanvas(c) {
+    var w = c.width, h = c.height;
+    var data = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+    var bits = new Uint8Array(w * h), minX = w, minY = h, maxX = -1, maxY = -1;
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] < 128) continue;
+        bits[y * w + x] = 1;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (maxX < 0) { clearSelection(); return; }
+    state.selection = {
+      canvas: c,
+      bits: bits,
+      bbox: { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 },
+      edges: selectionEdges(bits, w, h)
+    };
+    updateSelectionUi();
+    requestRender();
+  }
+
+  // Outline as merged horizontal and vertical runs along pixel borders (drawn as marching ants).
+  function selectionEdges(bits, w, h) {
+    var segs = [], x, y, start;
+    for (y = 0; y <= h; y++) {
+      start = -1;
+      for (x = 0; x <= w; x++) {
+        var a = y > 0 && x < w ? bits[(y - 1) * w + x] : 0;
+        var b = y < h && x < w ? bits[y * w + x] : 0;
+        if (a !== b && x < w) { if (start < 0) start = x; }
+        else if (start >= 0) { segs.push(start, y, x, y); start = -1; }
+      }
+    }
+    for (x = 0; x <= w; x++) {
+      start = -1;
+      for (y = 0; y <= h; y++) {
+        var l = x > 0 && y < h ? bits[y * w + x - 1] : 0;
+        var r = x < w && y < h ? bits[y * w + x] : 0;
+        if (l !== r && y < h) { if (start < 0) start = y; }
+        else if (start >= 0) { segs.push(x, start, x, y); start = -1; }
+      }
+    }
+    return Float32Array.from(segs);
+  }
+
+  function clearSelection() {
+    state.selection = null;
+    updateSelectionUi();
+    requestRender();
+  }
+
+  function selectAll() {
+    if (!state.doc) return;
+    applySelection(function (ctx) { ctx.fillRect(0, 0, state.doc.w, state.doc.h); }, 'new');
+  }
+
+  function invertSelection() {
+    if (!state.doc) return;
+    var sel = state.selection;
+    applySelection(function (ctx) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillRect(0, 0, state.doc.w, state.doc.h);
+      if (sel) {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.drawImage(sel.canvas, 0, 0);
+      }
+    }, 'new');
+  }
+
+  function wandSelect(p, mode) {
+    var d = state.doc;
+    var x = Math.floor(p.x), y = Math.floor(p.y);
+    if (x < 0 || y < 0 || x >= d.w || y >= d.h) return;
+    // Samples what you see: all visible layers together.
+    var flat = Layers.flatten(d, state.layers, d.background);
+    var img = flat.getContext('2d').getImageData(0, 0, d.w, d.h);
+    var mask = floodMask(img.data, d.w, d.h, x, y, state.tolerance, state.contiguous);
+    var out = new ImageData(d.w, d.h);
+    for (var i = 0; i < mask.length; i++) if (mask[i]) out.data[i * 4 + 3] = 255;
+    var tmp = newCanvas(d.w, d.h);
+    tmp.getContext('2d').putImageData(out, 0, 0);
+    applySelection(function (ctx) { ctx.drawImage(tmp, 0, 0); }, mode);
+  }
+
+  function finishSelectionDrag(op) {
+    var tiny = !op.p1 || Math.hypot(op.p1.x - op.p0.x, op.p1.y - op.p0.y) * state.zoom < 3;
+    if (op.type === 'lasso') tiny = op.points.length < 3;
+    if (tiny) {
+      if (op.mode === 'new') clearSelection();
+      return;
+    }
+    applySelection(function (ctx) {
+      ctx.beginPath();
+      if (op.type === 'lasso') {
+        op.points.forEach(function (pt, i) { if (i) ctx.lineTo(pt.x, pt.y); else ctx.moveTo(pt.x, pt.y); });
+        ctx.closePath();
+      } else {
+        var r = dragRect(op);
+        if (op.kind === 'marquee-ellipse') ctx.ellipse(r.x + r.w / 2, r.y + r.h / 2, r.w / 2, r.h / 2, 0, 0, Math.PI * 2);
+        else ctx.rect(r.x, r.y, r.w, r.h);
+      }
+      ctx.fill();
+    }, op.mode);
+  }
+
+  function dragRect(op) {
+    var dx = op.p1.x - op.p0.x, dy = op.p1.y - op.p0.y;
+    if (op.square) {
+      var m = Math.max(Math.abs(dx), Math.abs(dy));
+      dx = (dx < 0 ? -1 : 1) * m;
+      dy = (dy < 0 ? -1 : 1) * m;
+    }
+    return { x: Math.min(op.p0.x, op.p0.x + dx), y: Math.min(op.p0.y, op.p0.y + dy), w: Math.abs(dx), h: Math.abs(dy) };
+  }
+
+  var antsPhase = 0;
+  setInterval(function () {
+    if (state.selection || (state.op && (state.op.type === 'select' || state.op.type === 'lasso'))) {
+      antsPhase = (antsPhase + 1) % 8;
+      requestRender();
+    }
+  }, 120);
+
+  function drawSelectionOverlay() {
+    var op = state.op;
+    var path = new Path2D(), has = false;
+    if (state.selection) {
+      var e = state.selection.edges, z = state.zoom, px = state.panX, py = state.panY;
+      for (var i = 0; i < e.length; i += 4) {
+        path.moveTo(e[i] * z + px + 0.5, e[i + 1] * z + py + 0.5);
+        path.lineTo(e[i + 2] * z + px + 0.5, e[i + 3] * z + py + 0.5);
+      }
+      has = true;
+    }
+    if (op && op.type === 'select' && op.p1) {
+      var r = dragRect(op), a = toScreen({ x: r.x, y: r.y });
+      if (op.kind === 'marquee-ellipse') {
+        path.moveTo(a.x + r.w * state.zoom, a.y + (r.h * state.zoom) / 2);
+        path.ellipse(a.x + (r.w * state.zoom) / 2, a.y + (r.h * state.zoom) / 2, (r.w * state.zoom) / 2, (r.h * state.zoom) / 2, 0, 0, Math.PI * 2);
+      } else {
+        path.rect(a.x, a.y, r.w * state.zoom, r.h * state.zoom);
+      }
+      has = true;
+    }
+    if (op && op.type === 'lasso' && op.points.length > 1) {
+      op.points.forEach(function (pt, i) {
+        var s = toScreen(pt);
+        if (i) path.lineTo(s.x, s.y); else path.moveTo(s.x, s.y);
+      });
+      has = true;
+    }
+    if (!has) return;
+    vctx.save();
+    vctx.lineWidth = 1;
+    vctx.setLineDash([4, 4]);
+    vctx.strokeStyle = '#000000';
+    vctx.lineDashOffset = -antsPhase;
+    vctx.stroke(path);
+    vctx.strokeStyle = '#ffffff';
+    vctx.lineDashOffset = -antsPhase + 4;
+    vctx.stroke(path);
+    vctx.restore();
+  }
+
+  function updateSelectionUi() {
+    var sel = state.selection;
+    $('sel-actions').hidden = !sel;
+    if (sel) $('sel-size').textContent = sel.bbox.w + ' × ' + sel.bbox.h;
+  }
+
+  // The selection mask mapped into a layer's own pixel grid.
+  function selectionInLayer(l) {
+    var c = newCanvas(l.canvas.width, l.canvas.height), ctx = c.getContext('2d', { willReadFrequently: true });
+    var m = Layers.matrix(l).inverse();
+    ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
+    ctx.drawImage(state.selection.canvas, 0, 0);
+    return c;
+  }
+
+  function pixelLayerForSelection() {
+    var l = selected();
+    if (!l) { toast('Select a layer first.'); return null; }
+    if (l.type !== 'image') {
+      if (!window.confirm('This works on pixels. Convert "' + l.name + '" to a pixel layer?')) return null;
+      rasterize(l);
+    }
+    return l;
+  }
+
+  function replacePixels(l, draw) {
+    var c = newCanvas(l.canvas.width, l.canvas.height), ctx = c.getContext('2d');
+    ctx.drawImage(l.canvas, 0, 0);
+    draw(ctx);
+    l.canvas = c;
+    l.rev++;
+    commit();
+    requestRender();
+  }
+
+  function deleteSelected() {
+    if (!state.selection) return;
+    var l = pixelLayerForSelection();
+    if (!l) return;
+    var m = selectionInLayer(l);
+    replacePixels(l, function (ctx) {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.drawImage(m, 0, 0);
+    });
+  }
+
+  function fillSelected() {
+    if (!state.selection) return;
+    var target = paintTarget(true, 'Fill');
+    if (!target) return;
+    var l = target.layer, m = selectionInLayer(l);
+    var mctx = m.getContext('2d');
+    mctx.setTransform(1, 0, 0, 1, 0, 0);
+    mctx.globalCompositeOperation = 'source-in';
+    mctx.fillStyle = state.color;
+    mctx.fillRect(0, 0, m.width, m.height);
+    replacePixels(l, function (ctx) { ctx.drawImage(m, 0, 0); });
+  }
+
+  function copySelectionToLayer() {
+    if (!state.selection) return;
+    var l = pixelLayerForSelection();
+    if (!l) return;
+    var m = selectionInLayer(l);
+    var copy = Layers.duplicate(l);
+    var ctx = copy.canvas.getContext('2d');
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(m, 0, 0);
+    copy.name = l.name + ' (selection)';
+    copy.rev++;
+    addLayer(copy);
+    commit();
+    requestRender();
+    toast('Copied the selection to a new layer.');
+  }
+
+  function cropToSelection() {
+    if (!state.selection) return;
+    state.crop = state.selection.bbox;
+    applyCrop();
+  }
+
+  /* ---- remove object (content-aware fill) ---- */
+
+  function dilate(mask, w, h, times) {
+    for (var t = 0; t < times; t++) {
+      var src = mask.slice();
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          var i = y * w + x;
+          if (src[i]) continue;
+          if ((x > 0 && src[i - 1]) || (x < w - 1 && src[i + 1]) || (y > 0 && src[i - w]) || (y < h - 1 && src[i + w])) mask[i] = 1;
+        }
+      }
+    }
+    return mask;
+  }
+
+  function setBusy(text) {
+    state.busy = !!text;
+    $('busy').hidden = !text;
+    if (text) $('busy-text').textContent = text;
+  }
+
+  function removeObject() {
+    if (!state.selection) { toast('Select the object to remove first.'); return; }
+    var l = selected();
+    if (!l || l.type !== 'image') { toast('Select the photo layer to remove the object from.'); return; }
+    var w = l.canvas.width, h = l.canvas.height;
+    var md = selectionInLayer(l).getContext('2d').getImageData(0, 0, w, h).data;
+    var hole = new Uint8Array(w * h), minX = w, minY = h, maxX = -1, maxY = -1, i;
+    for (i = 0; i < w * h; i++) if (md[i * 4 + 3] >= 32) hole[i] = 1;
+    dilate(hole, w, h, 2); // also cover soft edges and halos around the object
+    for (i = 0; i < w * h; i++) {
+      if (!hole[i]) continue;
+      var x = i % w, y = (i / w) | 0;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    if (maxX < 0) { toast('The selection doesn\'t cover the selected layer.'); return; }
+
+    // Work on the area around the hole only: it's faster and the best patches are usually nearby.
+    var bw = maxX - minX + 1, bh = maxY - minY + 1;
+    var margin = Math.round(Math.min(320, Math.max(48, Math.max(bw, bh) * 0.9)));
+    var rx = Math.max(0, minX - margin), ry = Math.max(0, minY - margin);
+    var rw = Math.min(w, maxX + margin + 1) - rx, rh = Math.min(h, maxY + margin + 1) - ry;
+    var region = l.canvas.getContext('2d').getImageData(rx, ry, rw, rh);
+    var rhole = new Uint8Array(rw * rh);
+    for (var yy = 0; yy < rh; yy++) {
+      for (var xx = 0; xx < rw; xx++) rhole[yy * rw + xx] = hole[(yy + ry) * w + xx + rx];
+    }
+
+    setBusy('Removing object… 0%');
+    var started = Date.now();
+    Inpaint.run(region.data, rhole, rw, rh, function (p) {
+      setBusy('Removing object… ' + Math.round(p * 100) + '%');
+    }).then(function (out) {
+      replacePixels(l, function (ctx) { ctx.putImageData(new ImageData(out, rw, rh), rx, ry); });
+      toast('Object removed in ' + ((Date.now() - started) / 1000).toFixed(1) + 's. Ctrl+Z to undo.');
+    }, function (err) {
+      toast('Couldn\'t remove it: ' + err.message);
+    }).then(function () { setBusy(null); });
+  }
+
   /* ---- eyedropper & crop ---- */
 
   function pickColor(p, secondary) {
@@ -1045,6 +1399,7 @@
     state.doc.h = c.h;
     state.layers.forEach(function (l) { l.x -= c.x; l.y -= c.y; });
     state.crop = null;
+    clearSelection();
     updateCropUi();
     commit();
     fit();
@@ -1064,7 +1419,7 @@
     if (state.editing) finishTextEdit();
     state.tool = tool;
     state.hover = null;
-    Array.prototype.forEach.call(document.querySelectorAll('.opt-group'), function (g) {
+    Array.prototype.forEach.call(document.querySelectorAll('.opt-group[data-for]'), function (g) {
       g.hidden = g.dataset.for.split(' ').indexOf(tool) < 0;
     });
     wrap.dataset.tool = tool;
@@ -1365,6 +1720,7 @@
       }
       doc.w = round(w);
       doc.h = round(h);
+      clearSelection();
       commit();
       fit();
     });
@@ -1604,6 +1960,13 @@
     $('primary-color').oninput = function () { state.color = this.value; };
     $('secondary-color').oninput = function () { state.secondary = this.value; };
     $('swap-colors').onclick = swapColors;
+    $('sel-remove').onclick = removeObject;
+    $('sel-delete').onclick = deleteSelected;
+    $('sel-fill').onclick = fillSelected;
+    $('sel-copy').onclick = copySelectionToLayer;
+    $('sel-crop').onclick = cropToSelection;
+    $('sel-invert').onclick = invertSelection;
+    $('sel-clear').onclick = clearSelection;
     $('crop-apply').onclick = applyCrop;
     $('crop-cancel').onclick = cancelCrop;
     $('zoom-in').onclick = function () { zoomAt(1.25); };
@@ -1738,13 +2101,16 @@
 
   function bindKeys() {
     document.addEventListener('keydown', function (e) {
-      if (isTyping(e.target) || document.querySelector('dialog[open]')) return;
+      if (isTyping(e.target) || document.querySelector('dialog[open]') || state.busy) return;
       var key = e.key.toLowerCase();
       var mod = e.ctrlKey || e.metaKey;
       if (mod) {
         if (key === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
         else if (key === 'y') { e.preventDefault(); redo(); }
-        else if (key === 'j') { e.preventDefault(); duplicateLayer(selected()); }
+        else if (key === 'j') { e.preventDefault(); if (state.selection) copySelectionToLayer(); else duplicateLayer(selected()); }
+        else if (key === 'a') { e.preventDefault(); selectAll(); }
+        else if (key === 'd') { e.preventDefault(); clearSelection(); }
+        else if (key === 'i' && e.shiftKey) { e.preventDefault(); invertSelection(); }
         else if (key === 'e') { e.preventDefault(); mergeDown(selected()); }
         else if (key === '0') { e.preventDefault(); fit(); }
         else if (key === '=' || key === '+') { e.preventDefault(); zoomAt(1.25); }
@@ -1769,9 +2135,10 @@
         return;
       }
       var l = selected();
+      if ((key === 'delete' || key === 'backspace') && state.selection && l) { e.preventDefault(); deleteSelected(); return; }
       if ((key === 'delete' || key === 'backspace') && l) { e.preventDefault(); deleteLayer(l); return; }
       if (key === 'escape') {
-        if (state.crop) cancelCrop(); else select(null);
+        if (state.crop) cancelCrop(); else if (state.selection) clearSelection(); else select(null);
         return;
       }
       if (key === 'enter' && state.crop) { applyCrop(); return; }

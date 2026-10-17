@@ -54,10 +54,13 @@
     <div class="opt-group" data-for="spray">
       <label>Density <input type="range" id="spray-density" min="1" max="100" value="40"></label>
     </div>
-    <div class="opt-group" data-for="bucket magic-eraser">
+    <div class="opt-group" data-for="marquee-rect marquee-ellipse lasso wand">
+      <span class="opt-hint">Shift = add · Alt = subtract · Ctrl+A all · Ctrl+D deselect</span>
+    </div>
+    <div class="opt-group" data-for="bucket magic-eraser wand">
       <label>Tolerance <input type="range" id="fill-tolerance" min="0" max="255" value="32"> <output id="fill-tolerance-out">32</output></label>
       <label><input type="checkbox" id="fill-contiguous" checked> Contiguous</label>
-      <span class="opt-hint">Click on the selected layer</span>
+      <span class="opt-hint">Click on the image</span>
     </div>
     <div class="opt-group" data-for="gradient">
       <label>Type <select id="gradient-type"><option value="linear">Linear</option><option value="radial">Radial</option></select></label>
@@ -90,6 +93,16 @@
     <div class="opt-group" data-for="zoom">
       <span class="opt-hint">Click to zoom in · Alt+click to zoom out</span>
     </div>
+    <div class="opt-group sel-actions" id="sel-actions" hidden>
+      <span class="opt-hint">Selection <strong id="sel-size"></strong></span>
+      <button type="button" class="btn small primary" id="sel-remove" title="Rebuild the selected area from its surroundings">✨ Remove object</button>
+      <button type="button" class="btn small" id="sel-delete" title="Delete (Del)">Delete</button>
+      <button type="button" class="btn small" id="sel-fill" title="Fill with the main colour">Fill</button>
+      <button type="button" class="btn small" id="sel-copy" title="Copy to new layer (Ctrl+J)">To layer</button>
+      <button type="button" class="btn small" id="sel-crop">Crop</button>
+      <button type="button" class="btn small ghost" id="sel-invert" title="Invert (Ctrl+Shift+I)">Invert</button>
+      <button type="button" class="btn small ghost" id="sel-clear" title="Deselect (Ctrl+D)">Deselect</button>
+    </div>
     <div class="opt-right">
       <div class="swatches" title="Main and second colour (X swaps, D resets)">
         <input type="color" id="primary-color" value="#e11d48" aria-label="Main colour">
@@ -119,6 +132,7 @@
           <p class="muted small">Everything stays on your device. Nothing is uploaded.</p>
         </div>
       </div>
+      <div class="busy" id="busy" hidden><span class="spinner" aria-hidden="true"></span><span id="busy-text">Working…</span></div>
       <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
     </section>
 
@@ -321,6 +335,7 @@
   <script src="js/encoders.js"></script>
   <script src="js/editor/filters.js"></script>
   <script src="js/editor/layers.js"></script>
+  <script src="js/editor/inpaint.js"></script>
   <script src="js/editor/toolbar.js"></script>
   <script src="js/editor/editor.js"></script>
 </body>

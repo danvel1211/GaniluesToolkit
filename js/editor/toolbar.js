@@ -7,6 +7,10 @@
 
   var ICONS = {
     move: '<path d="M5 3l12 8-5 1.5L9 18z"/>',
+    'marquee-rect': '<rect x="4" y="5" width="16" height="14" stroke-dasharray="3 2.6"/>',
+    'marquee-ellipse': '<ellipse cx="12" cy="12" rx="8.5" ry="7" stroke-dasharray="3 2.6"/>',
+    lasso: '<path d="M7.5 16.5C4.8 15.4 3 13.4 3 11c0-3.9 4-7 9-7s9 3.1 9 7-4 7-9 7c-1.1 0-2.2-.1-3.2-.4M7.5 16.5c-1.2 1-1.4 3.2.3 3.9"/>',
+    wand: '<path d="M4 20L15 9M15 3v2.5M20.5 8.5H18M18.7 4.8l-1.6 1.6M11 4.8l1.3 1.3M18.7 12.6l-1.3-1.3"/>',
     brush: '<path d="M14 4l6 6-8.5 8.5a3 3 0 01-2 .9L5 20l.6-4.5a3 3 0 01.9-2z"/>',
     pencil: '<path d="M4 20l1.2-4.4L16 4.8l3.2 3.2L8.4 18.8zM14 7l3 3"/>',
     spray: '<path d="M6 10h7v10H6zM7.5 10V7h4v3M16 6h.01M19 4h.01M19 8h.01M22 6h.01M16.5 10h.01"/>',
@@ -30,6 +34,7 @@
   // Groups in toolbar order. Each tool: [id, name, short label, shortcut key].
   var GROUPS = [
     { id: 'move', tools: [['move', 'Move & transform', 'Move', 'V']] },
+    { id: 'select', tools: [['marquee-rect', 'Rectangle select', 'Select', 'M'], ['marquee-ellipse', 'Ellipse select', 'Ellipse', 'M'], ['lasso', 'Lasso (freehand select)', 'Lasso', 'L'], ['wand', 'Magic wand (select similar colour)', 'Wand', 'W']] },
     { id: 'brush', tools: [['brush', 'Brush', 'Brush', 'B'], ['pencil', 'Pencil (hard edge)', 'Pencil', 'B'], ['spray', 'Spray paint', 'Spray', 'B']] },
     { id: 'eraser', tools: [['eraser', 'Eraser', 'Eraser', 'E'], ['magic-eraser', 'Magic eraser', 'Magic', 'E']] },
     { id: 'fill', tools: [['bucket', 'Paint bucket', 'Fill', 'G'], ['gradient', 'Gradient', 'Gradient', 'G']] },

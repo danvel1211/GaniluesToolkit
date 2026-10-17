@@ -231,6 +231,34 @@
   pointer-events: none;
 }
 
+.sel-actions { gap: 6px; padding-left: 12px; border-left: 1px solid var(--border); }
+.stage-wrap[data-tool="marquee-rect"] canvas,
+.stage-wrap[data-tool="marquee-ellipse"] canvas,
+.stage-wrap[data-tool="lasso"] canvas,
+.stage-wrap[data-tool="wand"] canvas { cursor: crosshair; }
+
+.busy {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(10, 12, 18, 0.35);
+  color: #fff;
+  font-weight: 600;
+  cursor: progress;
+}
+.spinner {
+  width: 22px; height: 22px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* On-canvas text editing: a textarea laid exactly over the text layer. */
 .text-editor {
   position: absolute;
