@@ -1010,6 +1010,14 @@ window.STUDIOLO_LICENSE_DATA = {
    "ffff27eb7ed4514d4247f64b06806960",
    "ffff59636b347b62fdbaf7abfd008c98"
   ]
+ },
+ {
+  "id": "DEV",
+  "created": "2026-10-17",
+  "salt": "b8ab0deed35a5f3513d9780c3b6fea47",
+  "hashes": [
+   "85c55e3856889dc68ad26d2aa2a5a316"
+  ]
  }
 ]
 };

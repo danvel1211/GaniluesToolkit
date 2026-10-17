@@ -19,11 +19,22 @@
 
   var STORAGE_KEY = 'studiolo-license';
   var CONTACT = 'danvel1211@gmail.com';
+  // Readable form (license-codes.js): { batches: [{ id, salt, hashes: [hex…] }] }.
+  // Packaged form (made by tools/build_editions.py): { b: [{ i, s, h: base64 of 16-byte fingerprints }] }.
   var data = global.STUDIOLO_LICENSE_DATA || { batches: [] };
-  var lookups = data.batches.map(function (b) {
+  function blobToHex(b64) {
+    var bin = atob(b64), out = [];
+    for (var i = 0; i < bin.length; i += 16) {
+      var h = '';
+      for (var j = i; j < i + 16; j++) h += ('0' + bin.charCodeAt(j).toString(16)).slice(-2);
+      out.push(h);
+    }
+    return out;
+  }
+  var lookups = (data.batches || data.b || []).map(function (b) {
     var set = {};
-    b.hashes.forEach(function (h) { set[h] = true; });
-    return { id: b.id, salt: b.salt, set: set };
+    (b.hashes || blobToHex(b.h)).forEach(function (h) { set[h] = true; });
+    return { id: b.id || b.i, salt: b.salt || b.s, set: set };
   });
 
   /* ---------- checking a code ---------- */
@@ -55,7 +66,10 @@
     for (var i = 0; i < lookups.length; i++) {
       var fp = hex(global.nacl.hash(new TextEncoder().encode(lookups[i].salt + raw)), 16);
       if (lookups[i].set[fp]) {
-        return { ok: true, code: format(raw), batch: lookups[i].id, masked: '••••-••••-••••-' + raw.slice(12) };
+        return {
+          ok: true, code: format(raw), batch: lookups[i].id, masked: '••••-••••-••••-' + raw.slice(12),
+          developer: lookups[i].id === 'DEV' // the creator's own code
+        };
       }
     }
     return { ok: false, reason: 'That licence code isn\'t recognised. Check for typos, or contact ' + CONTACT + '.' };
@@ -189,7 +203,7 @@
     if (document.querySelector('.license-badge')) return;
     var badge = el('div', { class: 'license-badge', title: 'Licence ' + r.masked }, [
       el('span', { class: 'license-dot', 'aria-hidden': 'true' }),
-      document.createTextNode(r.name ? 'Licensed to ' + r.name : 'Licensed · ' + r.masked.slice(-4))
+      document.createTextNode((r.developer ? 'Developer · ' : 'Licensed to ') + (r.name || r.masked.slice(-4)))
     ]);
     document.body.appendChild(badge);
   }

@@ -33,8 +33,10 @@
     var btn = document.createElement('a');
     btn.className = 'btn';
     if (lic) {
-      title.textContent = lic.name ? 'Licensed to ' + lic.name : 'Studiolo is activated on this browser';
-      detail.textContent = 'Licence ' + lic.masked + '. Thank you for supporting Studiolo.';
+      title.textContent = lic.developer ? 'Developer licence · ' + (lic.name || 'Studiolo')
+        : lic.name ? 'Licensed to ' + lic.name : 'Studiolo is activated on this browser';
+      detail.textContent = lic.developer ? 'The creator\'s own licence (' + lic.masked + ').'
+        : 'Licence ' + lic.masked + '. Thank you for supporting Studiolo.';
       var rename = document.createElement('a');
       rename.className = 'btn';
       rename.href = '#';

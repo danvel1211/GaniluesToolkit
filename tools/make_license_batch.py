@@ -84,6 +84,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--count', type=int, default=1000)
     ap.add_argument('--out', required=True, help='folder OUTSIDE this project for the private code list')
+    ap.add_argument('--batch-id', help='batch name (default B1, B2, …); DEV marks developer codes')
     args = ap.parse_args()
     out = os.path.abspath(args.out)
     if out == ROOT or out.startswith(ROOT + os.sep):
@@ -91,7 +92,9 @@ def main():
     os.makedirs(out, exist_ok=True)
 
     batches = load_batches()
-    batch_id = 'B%d' % (len(batches) + 1)
+    batch_id = args.batch_id or 'B%d' % (sum(1 for b in batches if b['id'].startswith('B')) + 1)
+    if any(b['id'] == batch_id for b in batches):
+        raise SystemExit('Batch %s already exists.' % batch_id)
     salt = secrets.token_hex(16)
     codes = set()
     while len(codes) < args.count:
@@ -105,7 +108,8 @@ def main():
     })
     save_batches(batches)
 
-    stem = os.path.join(out, 'Studiolo licence codes - batch %s' % batch_id)
+    label = 'Studiolo developer code' if batch_id == 'DEV' else 'Studiolo licence codes - batch %s' % batch_id
+    stem = os.path.join(out, label)
     with open(stem + '.csv', 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
         w.writerow(['#', 'Licence code', 'Batch', 'Given to', 'Email', 'Date given', 'Notes'])

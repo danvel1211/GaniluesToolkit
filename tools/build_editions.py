@@ -6,9 +6,12 @@ in brands/editions.json is produced by swapping in its name, tagline, logo and c
 
     python3 tools/build_editions.py
 """
+import base64
 import json
 import os
+import re
 import shutil
+import subprocess
 import urllib.parse
 import zipfile
 
@@ -46,10 +49,48 @@ def brand_text(text, ed, svg):
             text = text.replace('<!-- brand-favicon -->', '<link rel="icon" href="data:image/svg+xml,%s">' % urllib.parse.quote(icon))
     if ed.get('headHtml'):
         text = text.replace('<!-- brand-head -->', ed['headHtml'])
+    for old, new in ed.get('rename', {}).items():
+        text = text.replace(old, new)
     for link in ed.get('navLinks', []):
         text = text.replace('<!-- brand-nav -->', '<a href="%s">%s</a>\n          <!-- brand-nav -->' % (link['href'], link['label']))
         text = text.replace('<!-- brand-home-link -->', ' <a class="home-link" href="%s">%s</a><!-- brand-home-link -->' % (link['href'], link['homeLabel']))
     return text
+
+
+def license_data_js():
+    """The licence fingerprints as one opaque block: no labels, no readable list."""
+    text = read('brands/studiolo/license-codes.js')
+    batches = json.loads(re.search(r'batches: (\[.*\])\s*\};', text, re.S).group(1))
+    compact = [{'i': b['id'], 's': b['salt'],
+                'h': base64.b64encode(b''.join(bytes.fromhex(h) for h in b['hashes'])).decode()} for b in batches]
+    return 'window.STUDIOLO_LICENSE_DATA=' + json.dumps({'b': compact}, separators=(',', ':')) + ';'
+
+
+def minify(code):
+    """Compresses with terser when available (npx); otherwise only strips comments."""
+    try:
+        result = subprocess.run(['npx', '--yes', 'terser@5.31.0', '--compress', '--mangle', '--comments', 'false'],
+                                input=code, capture_output=True, text=True, timeout=300)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout
+        print('  terser failed, falling back:', result.stderr.strip()[:200])
+    except (OSError, subprocess.TimeoutExpired) as err:
+        print('  terser unavailable (%s); comments stripped only' % err)
+    code = re.sub(r'/\*[\s\S]*?\*/', '', code)
+    return re.sub(r'^\s*//.*$', '', code, flags=re.M)
+
+
+def write_bundle(ed, out):
+    parts = []
+    for part in ed['bundle']['parts']:
+        parts.append(license_data_js() if part == '@license-data' else read(part))
+    code = '\n;\n'.join(parts)
+    for old, new in ed.get('rename', {}).items():
+        code = code.replace(old, new)
+    dst = os.path.join(out, ed['bundle']['output'])
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    with open(dst, 'w', encoding='utf-8') as f:
+        f.write(minify(code))
 
 
 def build(ed):
@@ -63,7 +104,7 @@ def build(ed):
         rel = os.path.relpath(folder, ROOT)
         dirs[:] = [d for d in dirs if not (rel == '.' and d in SKIP)]
         for name in files:
-            if rel == '.' and name in SKIP:
+            if rel == '.' and (name in SKIP or name in ed.get('exclude', [])):
                 continue
             src = os.path.join(folder, name)
             dst = os.path.join(out, rel, name)
@@ -72,7 +113,9 @@ def build(ed):
                 with open(src, encoding='utf-8') as f:
                     text = brand_text(f.read(), ed, svg)
                 if ed.get('css') and rel == 'css' and name == 'styles.css':
-                    text += '\n' + read(ed['css'])
+                    css = ed['css'] if isinstance(ed['css'], list) else [ed['css']]
+                    for path in css:
+                        text += '\n' + brand_text(read(path), ed, svg)
                 with open(dst, 'w', encoding='utf-8') as f:
                     f.write(text)
             else:
@@ -86,6 +129,8 @@ def build(ed):
                 f.write(brand_text(read(src_rel), ed, svg))
         else:
             shutil.copy2(os.path.join(ROOT, src_rel), dst)
+    if ed.get('bundle'):
+        write_bundle(ed, out)
     if package:
         for dst_rel, src_rel in package.get('rootFiles', {}).items():
             shutil.copy2(os.path.join(ROOT, src_rel), os.path.join(package_root, dst_rel))

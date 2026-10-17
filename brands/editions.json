@@ -13,7 +13,10 @@
     "tagline": "Private file tools that run in your browser.",
     "themeKey": "studiolo-theme",
     "logo": "brands/studiolo/logo.svg",
-    "css": "brands/studiolo/brand.css",
+    "css": [
+      "brands/studiolo/brand.css",
+      "brands/studiolo/license.css"
+    ],
     "navLinks": [
       {
         "href": "about.html",
@@ -26,12 +29,7 @@
       "css/about.css": "brands/studiolo/about.css",
       "js/about.js": "brands/studiolo/about.js",
       "icons/studiolo.png": "brands/studiolo/app-icon-512.png",
-      "icons/studiolo.ico": "brands/studiolo/Studiolo.ico",
-      "js/vendor/nacl-fast.min.js": "brands/studiolo/nacl-fast.min.js",
-      "js/vendor/LICENSE-tweetnacl.txt": "brands/studiolo/LICENSE-tweetnacl.txt",
-      "js/license-codes.js": "brands/studiolo/license-codes.js",
-      "js/license.js": "brands/studiolo/license.js",
-      "css/license.css": "brands/studiolo/license.css"
+      "icons/studiolo.ico": "brands/studiolo/Studiolo.ico"
     },
     "favicon": "icons/studiolo.png",
     "package": {
@@ -42,6 +40,26 @@
         "Add Studiolo to Desktop.cmd": "brands/studiolo/Add Studiolo to Desktop.cmd"
       }
     },
-    "headHtml": "<link rel=\"stylesheet\" href=\"css/license.css\">\n  <script src=\"js/vendor/nacl-fast.min.js\"></script>\n  <script src=\"js/license-codes.js\"></script>\n  <script src=\"js/license.js\"></script>"
+    "headHtml": "<script src=\"js/core.js\"></script>",
+    "bundle": {
+      "output": "js/core.js",
+      "parts": [
+        "brands/studiolo/nacl-fast.min.js",
+        "@license-data",
+        "brands/studiolo/license.js"
+      ]
+    },
+    "rename": {
+      "StudioloLicense": "__sx",
+      "STUDIOLO_LICENSE_DATA": "__sxd",
+      "studiolo-license": "sx.p",
+      "license-": "sx-",
+      ".hashes": ".q",
+      "data.batches": "data.bb",
+      "b.salt": "b.x"
+    },
+    "exclude": [
+      "README.md"
+    ]
   }
 ]
