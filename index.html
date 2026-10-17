@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Image Converter · Ganilues Toolkit</title>
+  <meta name="description" content="Convert, view, inspect and resize images right in your browser. JPEG, PNG, WebP, GIF, BMP, TIFF, ICO, EPS, PDF, SVG and more. Nothing is uploaded.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cpath d='M8 21l5-6 4 4 3-3 4 5z' fill='white'/%3E%3Ccircle cx='21' cy='11' r='2.5' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="7" fill="currentColor"/><path d="M8 21l5-6 4 4 3-3 4 5z" fill="#fff"/><circle cx="21" cy="11" r="2.5" fill="#fff"/></svg>
+      </span>
+      <div>
+        <h1>Image Converter</h1>
+        <p class="tagline">Ganilues Toolkit · runs entirely in your browser. Your files are never uploaded.</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Files -->
+    <section class="panel files-panel" aria-labelledby="files-title">
+      <h2 id="files-title">Files</h2>
+      <label class="dropzone" id="dropzone" tabindex="0">
+        <input type="file" id="file-input" multiple accept="image/*,.tif,.tiff,.ico,.cur,.heic,.heif,.avif,.svg">
+        <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <strong>Drop images here</strong>
+        <span>or click to browse · paste with Ctrl+V</span>
+      </label>
+      <ul class="file-list" id="file-list" aria-label="Loaded files"></ul>
+      <div class="row gap" id="file-actions" hidden>
+        <button type="button" class="btn ghost small" id="clear-files">Remove all</button>
+      </div>
+    </section>
+
+    <!-- Preview -->
+    <section class="panel preview-panel" aria-labelledby="preview-title">
+      <div class="panel-head">
+        <h2 id="preview-title">Preview</h2>
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button type="button" class="btn ghost small" data-zoom="out" aria-label="Zoom out">−</button>
+          <button type="button" class="btn ghost small" data-zoom="fit">Fit</button>
+          <button type="button" class="btn ghost small" data-zoom="100">100%</button>
+          <button type="button" class="btn ghost small" data-zoom="in" aria-label="Zoom in">+</button>
+          <span class="zoom-level" id="zoom-level">Fit</span>
+        </div>
+      </div>
+      <div class="stage" id="stage">
+        <div class="empty" id="empty-state">
+          <p><strong>No image selected</strong></p>
+          <p>Add a JPEG, PNG, WebP, GIF, BMP, TIFF, ICO, SVG, AVIF or HEIC file to start.</p>
+        </div>
+        <canvas id="preview" hidden></canvas>
+      </div>
+      <p class="stage-caption" id="stage-caption"></p>
+
+      <h2 class="section-title">Converted files</h2>
+      <ul class="result-list" id="result-list"></ul>
+      <p class="muted" id="results-empty">Converted files show up here, ready to download.</p>
+      <div class="row gap" id="result-actions" hidden>
+        <button type="button" class="btn small" id="download-all">Download all</button>
+        <button type="button" class="btn ghost small" id="clear-results">Clear</button>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <aside class="panel settings-panel" aria-label="Settings">
+      <details open>
+        <summary><h2>File info</h2></summary>
+        <table class="info" id="info-table"><tbody><tr><td class="muted">Select a file to see its details.</td></tr></tbody></table>
+      </details>
+
+      <details open>
+        <summary><h2>Convert to</h2></summary>
+        <div class="format-grid" id="format-grid" role="radiogroup" aria-label="Output format"></div>
+        <p class="hint" id="format-note"></p>
+
+        <div class="field" id="quality-field">
+          <label for="quality">Quality <output id="quality-out">90</output></label>
+          <input type="range" id="quality" min="10" max="100" value="90">
+        </div>
+        <div class="field-row">
+          <div class="field" id="bg-field">
+            <label for="background">Background</label>
+            <input type="color" id="background" value="#ffffff">
+          </div>
+          <div class="field" id="dpi-field">
+            <label for="dpi">DPI</label>
+            <input type="number" id="dpi" min="1" max="2400" value="72">
+          </div>
+        </div>
+        <p class="hint" id="bg-hint">Formats without transparency are filled with the background colour.</p>
+      </details>
+
+      <details open>
+        <summary><h2>Resize</h2></summary>
+        <div class="field">
+          <label for="resize-mode">Mode</label>
+          <select id="resize-mode">
+            <option value="original">Keep original size</option>
+            <option value="percent">Scale by percentage</option>
+            <option value="fit">Fit inside box (keep proportions)</option>
+            <option value="exact">Exact size (stretch)</option>
+          </select>
+        </div>
+        <div class="field" id="percent-field" hidden>
+          <label for="percent">Scale <output id="percent-out">50%</output></label>
+          <input type="range" id="percent" min="1" max="400" value="50">
+          <div class="chips">
+            <button type="button" class="chip" data-percent="25">25%</button>
+            <button type="button" class="chip" data-percent="50">50%</button>
+            <button type="button" class="chip" data-percent="75">75%</button>
+            <button type="button" class="chip" data-percent="200">200%</button>
+          </div>
+        </div>
+        <div class="field-row" id="dims-field" hidden>
+          <div class="field">
+            <label for="width">Width (px)</label>
+            <input type="number" id="width" min="1" max="16384" placeholder="auto">
+          </div>
+          <div class="field">
+            <label for="height">Height (px)</label>
+            <input type="number" id="height" min="1" max="16384" placeholder="auto">
+          </div>
+        </div>
+        <div class="chips" id="preset-chips" hidden>
+          <button type="button" class="chip" data-size="1920x1080">1920×1080</button>
+          <button type="button" class="chip" data-size="1280x720">1280×720</button>
+          <button type="button" class="chip" data-size="1080x1080">1080×1080</button>
+          <button type="button" class="chip" data-size="512x512">512×512</button>
+        </div>
+        <p class="output-size" id="output-size"></p>
+      </details>
+
+      <details>
+        <summary><h2>Rotate &amp; flip</h2></summary>
+        <div class="chips">
+          <button type="button" class="chip" id="rotate-left">⟲ Rotate left</button>
+          <button type="button" class="chip" id="rotate-right">⟳ Rotate right</button>
+          <button type="button" class="chip" id="flip-h" aria-pressed="false">⇋ Flip horizontal</button>
+          <button type="button" class="chip" id="flip-v" aria-pressed="false">⇵ Flip vertical</button>
+          <button type="button" class="chip" id="reset-transform">Reset</button>
+        </div>
+      </details>
+
+      <div class="actions">
+        <button type="button" class="btn primary" id="convert-one" disabled>Convert selected</button>
+        <button type="button" class="btn" id="convert-all" disabled>Convert all</button>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    Works offline. Reads JPEG, PNG, WebP, GIF, BMP, ICO, TIFF, SVG, AVIF (and HEIC where the browser supports it).
+    EPS, PDF and SVG output wrap the image. Raster pixels are not traced into vector paths.
+  </footer>
+
+  <script src="js/vendor/pako_inflate.min.js"></script>
+  <script src="js/vendor/UTIF.js"></script>
+  <script src="js/detect.js"></script>
+  <script src="js/encoders.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
