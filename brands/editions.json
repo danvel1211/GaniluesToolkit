@@ -1,0 +1,18 @@
+[
+  {
+    "id": "off-the-clock-creative-suite",
+    "name": "Off the Clock Creative Suite",
+    "tagline": "Private creative and file tools that run in your browser.",
+    "themeKey": "offtheclock-theme",
+    "logo": null,
+    "css": null
+  },
+  {
+    "id": "studiolo",
+    "name": "Studiolo",
+    "tagline": "Private file tools that run in your browser.",
+    "themeKey": "studiolo-theme",
+    "logo": "brands/studiolo/logo.svg",
+    "css": "brands/studiolo/brand.css"
+  }
+]

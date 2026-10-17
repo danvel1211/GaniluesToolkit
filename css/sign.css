@@ -1,8 +1,8 @@
 /* Handwriting fonts for typed signatures, bundled under the SIL Open Font License (see fonts/). */
-@font-face { font-family: "Studiolo Dancing"; src: url("../fonts/dancing-script.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Studiolo Vibes"; src: url("../fonts/great-vibes.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Studiolo Caveat"; src: url("../fonts/caveat.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Studiolo Allura"; src: url("../fonts/allura.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "OTC Dancing"; src: url("../fonts/dancing-script.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "OTC Vibes"; src: url("../fonts/great-vibes.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "OTC Caveat"; src: url("../fonts/caveat.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "OTC Allura"; src: url("../fonts/allura.woff2") format("woff2"); font-display: swap; }
 
 /* Fill & Sign page. Builds on the tokens and components in styles.css. */
 

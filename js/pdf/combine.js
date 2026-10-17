@@ -549,8 +549,8 @@
       return chain;
     }).then(function () {
       out.setTitle(($('out-name').value || 'combined').trim());
-      out.setProducer('Studiolo');
-      out.setCreator('Studiolo');
+      out.setProducer('Off the Clock Creative Suite');
+      out.setCreator('Off the Clock Creative Suite');
       return out.save();
     }).then(function (bytes) {
       var name = (($('out-name').value || 'combined').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'combined') + '.pdf';

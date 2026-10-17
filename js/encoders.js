@@ -344,7 +344,7 @@
     var ptW = (w * 72) / opts.dpi, ptH = (h * 72) / opts.dpi;
     var header = [
       '%!PS-Adobe-3.0 EPSF-3.0',
-      '%%Creator: Studiolo',
+      '%%Creator: Off the Clock Creative Suite',
       '%%Title: ' + (opts.title || 'image').replace(/[\r\n]/g, ' '),
       '%%BoundingBox: 0 0 ' + Math.ceil(ptW) + ' ' + Math.ceil(ptH),
       '%%HiResBoundingBox: 0 0 ' + fmt(ptW) + ' ' + fmt(ptH),

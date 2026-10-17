@@ -1,5 +1,5 @@
 /*
- * Adds the light/dark switch to the page header and the gradient used by the logo.
+ * Adds the light/dark switch to the page header and the gradient used by an edition's logo.
  */
 (function () {
   'use strict';
@@ -13,7 +13,7 @@
   defs.setAttribute('aria-hidden', 'true');
   defs.style.position = 'absolute';
   defs.innerHTML = '<defs><linearGradient id="logo-grad" x1="0" y1="0" x2="1" y2="1">' +
-    '<stop offset="0" stop-color="#7c6cff"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>';
+    '<stop offset="0" style="stop-color: var(--logo-a, #7c6cff)"/><stop offset="1" style="stop-color: var(--logo-b, #3b82f6)"/></linearGradient></defs>';
   document.body.appendChild(defs);
 
   function current() {
@@ -34,7 +34,7 @@
   btn.onclick = function () {
     var next = current() === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
-    try { localStorage.setItem('studiolo-theme', next); } catch (e) { /* storage blocked */ }
+    try { localStorage.setItem('offtheclock-theme', next); } catch (e) { /* storage blocked */ }
     label();
     window.dispatchEvent(new CustomEvent('themechange', { detail: next }));
   };

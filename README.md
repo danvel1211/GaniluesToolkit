@@ -1,8 +1,8 @@
-# Studiolo
+# Off the Clock Creative Suite
 
-*Private file tools that run in your browser.*
+*Private creative and file tools that run in your browser.*
 
-Studiolo (Italian for a small private study) is a set of standalone web tools for working with files. It is free for anyone to use. Open `index.html` to get the home screen:
+Off the Clock Creative Suite is a set of standalone web tools for working with files and images. It is free for anyone to use. Open `index.html` to get the home screen:
 
 - **File combination** (`pdf.html`): merge PDFs and images into one PDF, arrange, rotate, duplicate and delete pages, or extract selected pages.
 - **Fill & sign PDF** (`sign.html`): fill in PDF forms, detect blank fields in ordinary PDFs, add text, dates, ticks and white-out, and sign with a drawn, typed or uploaded signature.
@@ -10,6 +10,23 @@ Studiolo (Italian for a small private study) is a set of standalone web tools fo
 - **File converter** (`converter.html`): convert, view, inspect and resize images, one at a time or in batches.
 
 Everything runs in the browser, works offline, and has a light and a dark theme (dark by default; the switch is in every header).
+
+## Editions
+
+The same app ships under two brands, listed in `brands/editions.json`:
+
+| Edition | Logo | Accent colour |
+|---|---|---|
+| Off the Clock Creative Suite | none yet | indigo / blue |
+| Studiolo | arched window (`brands/studiolo/logo.svg`) | amber / terracotta (`brands/studiolo/brand.css`) |
+
+The files in this folder are the Off the Clock Creative Suite edition. To build both editions as ready-to-share folders and ZIP files in `dist/`, run:
+
+```
+python3 tools/build_editions.py
+```
+
+The script swaps in each edition's name, tagline, logo, favicon and colours, so new features only need to be written once. To give Off the Clock Creative Suite a logo later, add an SVG and point its `logo` entry in `brands/editions.json` at it. Logos go where the `<!-- brand-logo -->` placeholders are in each page.
 
 ## Privacy
 
@@ -135,6 +152,8 @@ No build step and no install. Either:
 index.html          Home screen
 converter.html      Converter page
 pdf.html            File combination page
+brands/             Edition names, logos and colours
+tools/build_editions.py  Builds each edition into dist/
 css/styles.css      Shared styling and light/dark themes
 css/pdf.css         File combination styling
 js/theme.js         Applies the saved theme before the page paints

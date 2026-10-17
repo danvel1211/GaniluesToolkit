@@ -13,11 +13,11 @@
 
   // The first four are bundled with the app (fonts/), so typed signatures look the same everywhere.
   var SIG_FONTS = [
-    '"Studiolo Dancing", cursive',
-    '"Studiolo Vibes", cursive',
-    '"Studiolo Allura", cursive',
-    '"Studiolo Caveat", cursive',
-    '"Segoe Script", "Snell Roundhand", "Studiolo Dancing", cursive',
+    '"OTC Dancing", cursive',
+    '"OTC Vibes", cursive',
+    '"OTC Allura", cursive',
+    '"OTC Caveat", cursive',
+    '"Segoe Script", "Snell Roundhand", "OTC Dancing", cursive',
     'Georgia, "Times New Roman", serif'
   ];
 
