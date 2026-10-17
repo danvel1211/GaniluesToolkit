@@ -549,8 +549,8 @@
       return chain;
     }).then(function () {
       out.setTitle(($('out-name').value || 'combined').trim());
-      out.setProducer('Ganilues Toolkit');
-      out.setCreator('Ganilues Toolkit');
+      out.setProducer('Studiolo');
+      out.setCreator('Studiolo');
       return out.save();
     }).then(function (bytes) {
       var name = (($('out-name').value || 'combined').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'combined') + '.pdf';

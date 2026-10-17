@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Privacy: nothing may be loaded from or sent to the internet; everything ships with the app. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self' data: blob:; media-src 'self' data: blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fill &amp; Sign PDF · Studiolo</title>
+  <meta name="description" content="Fill in PDF forms, detect fields and sign with a drawn, typed or uploaded signature, right in your browser. Nothing is uploaded.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cpath d='M8 21l5-6 4 4 3-3 4 5z' fill='white'/%3E%3Ccircle cx='21' cy='11' r='2.5' fill='white'/%3E%3C/svg%3E">
+  <script src="js/theme.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/sign.css">
+</head>
+<body class="sign-page">
+  <header class="topbar">
+    <div class="brand">
+      <a class="logo" href="index.html" aria-label="Studiolo home">
+        <svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="7" fill="currentColor"/><path d="M8 21l5-6 4 4 3-3 4 5z" fill="#fff"/><circle cx="21" cy="11" r="2.5" fill="#fff"/></svg>
+      </a>
+      <div>
+        <h1>Fill &amp; Sign PDF</h1>
+        <nav class="appnav" aria-label="Studiolo">
+          <a href="index.html">Home</a>
+          <a href="pdf.html">Combine</a>
+          <a href="sign.html" aria-current="page">Sign</a>
+          <a href="editor.html">Editor</a>
+          <a href="converter.html">Converter</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <div class="sign-toolbar" role="toolbar" aria-label="Tools">
+    <button type="button" class="btn small" id="open-btn">Open PDF</button>
+    <input type="file" id="open-input" accept="application/pdf,.pdf" hidden>
+    <span class="tb-sep" aria-hidden="true"></span>
+    <div class="tool-row" id="tool-row">
+      <button type="button" class="stool" data-tool="select" aria-pressed="true" title="Select & move (V)">
+        <svg viewBox="0 0 24 24"><path d="M5 3l12 8-5 1.5L9 18z"/></svg><span>Select</span>
+      </button>
+      <button type="button" class="stool" data-tool="text" title="Add text (T)">
+        <svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span>Text</span>
+      </button>
+      <button type="button" class="stool" data-tool="signature" title="Signature (S)">
+        <svg viewBox="0 0 24 24"><path d="M3 17c3-1 4-9 6-9s-1 9 1 9 3-5 4-5 0 4 2 4 2-2 4-2M3 21h18"/></svg><span>Signature</span>
+      </button>
+      <button type="button" class="stool" data-tool="date" title="Today's date (D)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Date</span>
+      </button>
+      <button type="button" class="stool" data-tool="check" title="Tick mark">
+        <svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg><span>Tick</span>
+      </button>
+      <button type="button" class="stool" data-tool="cross" title="Cross mark">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Cross</span>
+      </button>
+      <button type="button" class="stool" data-tool="whiteout" title="White-out: cover existing content (W)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 12h10" stroke-dasharray="2 2"/></svg><span>White-out</span>
+      </button>
+    </div>
+    <span class="tb-sep" aria-hidden="true"></span>
+    <button type="button" class="btn small" id="detect-btn" disabled title="Find blanks like Name: ____ and Signature: ____">
+      <svg viewBox="0 0 24 24" class="btn-icon"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M8.5 11h5"/></svg>Detect fields
+    </button>
+    <div class="tb-right">
+      <button type="button" class="icon-btn" id="zoom-out" aria-label="Zoom out">−</button>
+      <button type="button" class="btn small ghost" id="zoom-fit" title="Fit width">100%</button>
+      <button type="button" class="icon-btn" id="zoom-in" aria-label="Zoom in">+</button>
+      <button type="button" class="btn small primary" id="download-btn" disabled>Download PDF</button>
+    </div>
+  </div>
+
+  <main class="sign-layout">
+    <section class="sign-stage" id="stage" aria-label="Document">
+      <div class="sign-empty" id="empty-state">
+        <div class="sign-empty-card">
+          <div class="sign-empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v4h4"/><path d="M8.5 16.5c1.5-.5 2-4 3-4s-.5 4 .5 4 1.5-2 2-2 0 1.5 1 1.5"/></svg>
+          </div>
+          <h2>Fill in and sign a PDF</h2>
+          <p>Drop a PDF here or open one. Fillable form fields are found automatically; for other PDFs use <strong>Detect fields</strong>.</p>
+          <button type="button" class="btn primary" id="empty-open">Open PDF</button>
+        </div>
+      </div>
+      <div class="pages" id="pages"></div>
+    </section>
+
+    <aside class="panel sign-side" aria-label="Details">
+      <section class="side-block" id="sel-block" hidden>
+        <h2 id="sel-title">Selected</h2>
+        <div class="field-row" id="text-opts">
+          <div class="field">
+            <label for="opt-size">Size (pt)</label>
+            <input type="number" id="opt-size" min="4" max="96" value="12">
+          </div>
+          <div class="field">
+            <label for="opt-color">Colour</label>
+            <input type="color" id="opt-color" value="#111111">
+          </div>
+        </div>
+        <div class="chips">
+          <button type="button" class="chip" id="opt-dup">Duplicate</button>
+          <button type="button" class="chip danger" id="opt-delete">Delete</button>
+        </div>
+      </section>
+
+      <section class="side-block">
+        <h2>Signatures</h2>
+        <div class="sig-list" id="sig-list"></div>
+        <button type="button" class="btn small" id="new-sig">+ New signature</button>
+        <p class="hint">Click a signature, then click on the page to place it. Signatures are kept only until you close this tab.</p>
+      </section>
+
+      <section class="side-block" id="fields-block" hidden>
+        <h2>Form fields</h2>
+        <p class="kv"><span>Fillable fields found</span><strong id="field-count">0</strong></p>
+        <p class="kv"><span>Detected blanks</span><strong id="detect-count">0</strong></p>
+        <label class="check-row"><input type="checkbox" id="flatten"> Lock the form after filling (flatten)</label>
+      </section>
+
+      <section class="side-block">
+        <h2>Document</h2>
+        <p class="kv"><span>File</span><strong id="doc-name">-</strong></p>
+        <p class="kv"><span>Pages</span><strong id="doc-pages">-</strong></p>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <ul class="tips">
+        <li>Click a tool, then click on the page.</li>
+        <li>Drag items to move them; drag the corner to resize.</li>
+        <li><kbd>Del</kbd> removes the selected item, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</li>
+        <li>White-out + Text lets you replace words on the page.</li>
+      </ul>
+    </aside>
+  </main>
+
+  <!-- Signature maker -->
+  <dialog id="sig-dialog" class="dialog sig-dialog">
+    <form method="dialog">
+      <h2>Create your signature</h2>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab" role="tab" data-tab="draw" aria-selected="true">Draw</button>
+        <button type="button" class="tab" role="tab" data-tab="type" aria-selected="false">Type</button>
+        <button type="button" class="tab" role="tab" data-tab="upload" aria-selected="false">Upload image</button>
+      </div>
+
+      <div class="tab-panel" data-panel="draw">
+        <div class="sig-pad-wrap">
+          <canvas id="sig-pad" width="1200" height="400" aria-label="Draw your signature here"></canvas>
+          <span class="sig-line" aria-hidden="true"></span>
+          <span class="sig-pad-hint" id="pad-hint">Sign here with your mouse, pen or finger</span>
+        </div>
+        <div class="sig-controls">
+          <div class="swatch-row" role="radiogroup" aria-label="Ink colour">
+            <button type="button" class="ink" data-ink="#111827" aria-checked="true" role="radio" style="--ink:#111827" aria-label="Black"></button>
+            <button type="button" class="ink" data-ink="#1d3fb8" aria-checked="false" role="radio" style="--ink:#1d3fb8" aria-label="Blue"></button>
+            <button type="button" class="ink" data-ink="#b91c1c" aria-checked="false" role="radio" style="--ink:#b91c1c" aria-label="Red"></button>
+          </div>
+          <label>Pen <input type="range" id="pen-width" min="2" max="14" value="5"></label>
+          <button type="button" class="btn small ghost" id="pad-clear">Clear</button>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="type" hidden>
+        <div class="field">
+          <label for="type-name">Your name</label>
+          <input type="text" id="type-name" placeholder="Type your name" autocomplete="name">
+        </div>
+        <div class="type-styles" id="type-styles"></div>
+      </div>
+
+      <div class="tab-panel" data-panel="upload" hidden>
+        <label class="dropzone small-drop" id="sig-drop">
+          <input type="file" id="sig-file" accept="image/*">
+          <strong>Choose a photo or scan of your signature</strong>
+          <span>Dark ink on light paper works best</span>
+        </label>
+        <div class="upload-preview" id="upload-preview" hidden>
+          <canvas id="upload-canvas"></canvas>
+        </div>
+        <div class="field" id="threshold-field" hidden>
+          <label for="threshold">Remove background <output id="threshold-out">70%</output></label>
+          <input type="range" id="threshold" min="30" max="95" value="70">
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="submit" class="btn primary" value="ok" id="sig-ok">Use signature</button>
+        <button type="submit" class="btn ghost" value="cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="js/vendor/pdf.min.js"></script>
+  <script src="js/vendor/pdf.worker.min.js"></script>
+  <script src="js/vendor/pdf-lib.min.js"></script>
+  <script src="js/theme-toggle.js"></script>
+  <script src="js/pdf/sign.js"></script>
+</body>
+</html>

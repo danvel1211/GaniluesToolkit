@@ -34,7 +34,7 @@
   btn.onclick = function () {
     var next = current() === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
-    try { localStorage.setItem('ganilues-theme', next); } catch (e) { /* storage blocked */ }
+    try { localStorage.setItem('studiolo-theme', next); } catch (e) { /* storage blocked */ }
     label();
     window.dispatchEvent(new CustomEvent('themechange', { detail: next }));
   };

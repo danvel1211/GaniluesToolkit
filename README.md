@@ -1,8 +1,11 @@
-# Ganilues Toolkit
+# Studiolo
 
-A set of standalone web tools for working with files. Open `index.html` to get the home screen:
+*Private file tools that run in your browser.*
+
+Studiolo (Italian for a small private study) is a set of standalone web tools for working with files. It is free for anyone to use. Open `index.html` to get the home screen:
 
 - **File combination** (`pdf.html`): merge PDFs and images into one PDF, arrange, rotate, duplicate and delete pages, or extract selected pages.
+- **Fill & sign PDF** (`sign.html`): fill in PDF forms, detect blank fields in ordinary PDFs, add text, dates, ticks and white-out, and sign with a drawn, typed or uploaded signature.
 - **Edit image** (`editor.html`): a layer-based image editor with selections, object removal, filters, painting, text, shapes and crop.
 - **File converter** (`converter.html`): convert, view, inspect and resize images, one at a time or in batches.
 
@@ -10,7 +13,7 @@ Everything runs in the browser, works offline, and has a light and a dark theme 
 
 ## Privacy
 
-- **Nothing is uploaded and nothing is downloaded from the internet.** Every library, icon and font the app uses ships inside this folder. There are no CDNs, web fonts, analytics, cookies or trackers.
+- **Nothing is uploaded and nothing is downloaded from the internet.** Every library, icon and font the app uses ships inside this folder (the handwriting fonts for typed signatures are in `fonts/`). There are no CDNs, web fonts, analytics, cookies or trackers.
 - **Enforced by the browser:** every page carries a Content Security Policy that blocks connections to any other address, so even a future mistake in the code couldn't send your files anywhere or pull content from the web.
 - **Stored on your device:** only the light/dark theme choice, in the browser's local storage. Files you open stay in memory and are gone when you close the tab.
 
@@ -22,6 +25,16 @@ Everything runs in the browser, works offline, and has a light and a dark theme 
 - **Download** everything as one PDF, or only the selected pages (also a quick way to split a PDF).
 - Pages are copied, not re-rendered, so text stays selectable and graphics stay sharp. Images can be placed on A4 or Letter pages, or at their own size.
 - `samples/` has three small PDFs to try it with (a 3-page report, a 2-page invoice with a landscape page, and a 4-page gallery with one page stored rotated).
+
+## Fill & sign PDF
+
+- **Fillable forms:** form fields in the PDF (text boxes, tick boxes, radio buttons, dropdowns) are found automatically and shown as inputs right on the page. Your answers are saved into the real form fields. Tick **Lock the form after filling** to flatten them so they can't be changed.
+- **Detect fields** (for PDFs without real fields): finds blanks such as `Name: ______`, `Date: ____` and `Signature: ________` from the page text and highlights them. Click one to type, add today's date, or sign, and the entry is placed on the line. It looks at text, so blanks drawn only as lines with no label, or scanned paper pages, aren't detected; use the Text and Signature tools there.
+- **Signatures:** draw one (mouse, pen or finger; pen pressure is used), type your name in a handwriting style, or upload a photo/scan, and the paper background is removed automatically. Signatures are kept only until you close the tab.
+- **Other tools:** text (any size and colour), today's date, ✓ and ✗ marks, and white-out for covering existing content (type on top of it to replace words). Drag to move, drag the corner to resize, Del to remove, Ctrl+Z to undo.
+- Everything is drawn into the PDF itself, including on rotated pages. Text uses the standard Helvetica font; characters it can't show (emoji, Chinese, etc.) are added as an image so they still appear.
+- **This is not a certified digital signature.** The signature is a picture of your handwriting placed on the page, the same as signing a printout. Some contracts or government forms require a certificate-based digital signature from an approved provider instead.
+- Samples: `Sample-D-Form.pdf` (a fillable form) and `Sample-E-Agreement.pdf` (a plain agreement with blank lines).
 
 ## Editor
 
@@ -127,6 +140,9 @@ css/pdf.css         File combination styling
 js/theme.js         Applies the saved theme before the page paints
 js/theme-toggle.js  Light/dark switch
 js/pdf/combine.js   File combination logic
+sign.html           Fill & sign page
+css/sign.css        Fill & sign styling
+js/pdf/sign.js      Fill & sign logic (form fields, field detection, signatures, saving)
 samples/            Sample PDFs
 editor.html         Editor page
 css/editor.css      Editor styling
@@ -145,14 +161,15 @@ js/vendor/          Third-party libraries (see below)
 
 ## Third-party libraries
 
-All bundled in `js/vendor/` with their licence files. Every licence allows free use, including commercial use, as long as the licence notices are kept with the code.
+All bundled in `js/vendor/` and `fonts/` with their licence files. Every licence allows free use, including commercial use, as long as the licence notices are kept with the code.
 
 | Library | Used for | Licence |
 |---|---|---|
 | [pdf.js](https://github.com/mozilla/pdf.js) 3.11 (Mozilla) | Showing PDF pages | Apache 2.0 |
-| [pdf-lib](https://github.com/Hopding/pdf-lib) 1.17 | Building the combined PDF | MIT |
+| [pdf-lib](https://github.com/Hopding/pdf-lib) 1.17 | Building combined PDFs, filling forms, adding signatures | MIT |
 | [UTIF.js](https://github.com/photopea/UTIF.js) 3.1 | Reading TIFF files | MIT |
 | [pako](https://github.com/nodeca/pako) 1.0 | Deflate decompression for TIFF | MIT |
+| Dancing Script, Great Vibes, Allura, Caveat (in `fonts/`) | Typed signature styles | SIL Open Font License 1.1 |
 
 Everything else (encoders, editor, object removal, EPS reader) is original code in this repository.
 

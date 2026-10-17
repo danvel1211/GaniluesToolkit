@@ -5,6 +5,6 @@
 (function () {
   'use strict';
   var theme = 'dark';
-  try { theme = localStorage.getItem('ganilues-theme') || 'dark'; } catch (e) { /* storage blocked */ }
+  try { theme = localStorage.getItem('studiolo-theme') || 'dark'; } catch (e) { /* storage blocked */ }
   document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
 })();

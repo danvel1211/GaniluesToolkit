@@ -80,7 +80,7 @@
   /* ---- 1. this toolkit's own EPS ---- */
 
   function fromToolkitEps(text) {
-    if (text.indexOf('%%Creator: Ganilues Toolkit') < 0) return null;
+    if (text.indexOf('/DataSource currentfile /ASCII85Decode filter >> image') < 0) return null;
     var m = /\/Width (\d+) \/Height (\d+)[\s\S]*?\/ASCII85Decode filter >> image\n/.exec(text);
     if (!m) return null;
     var w = +m[1], h = +m[2];
