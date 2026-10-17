@@ -16,7 +16,10 @@
       </span>
       <div>
         <h1>Image Converter</h1>
-        <p class="tagline">Ganilues Toolkit · runs entirely in your browser. Your files are never uploaded.</p>
+        <nav class="appnav" aria-label="Ganilues Toolkit">
+          <a href="index.html" aria-current="page">Converter</a>
+          <a href="editor.html">Editor</a>
+        </nav>
       </div>
     </div>
   </header>
@@ -156,13 +159,14 @@
   </main>
 
   <footer class="footer">
-    Works offline. Reads JPEG, PNG, WebP, GIF, BMP, ICO, TIFF, SVG, AVIF (and HEIC where the browser supports it).
+    Runs entirely in your browser: files are never uploaded and it works offline. Reads JPEG, PNG, WebP, GIF, BMP, ICO, TIFF, SVG, AVIF (and HEIC where the browser supports it).
     EPS, PDF and SVG output wrap the image. Raster pixels are not traced into vector paths.
   </footer>
 
   <script src="js/vendor/pako_inflate.min.js"></script>
   <script src="js/vendor/UTIF.js"></script>
   <script src="js/detect.js"></script>
+  <script src="js/decode.js"></script>
   <script src="js/encoders.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -314,3 +314,16 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 .status.error { color: var(--danger); }
 
 .footer { padding: 12px 20px 20px; text-align: center; font-size: 12px; color: var(--muted); }
+
+/* ---- app navigation (shared by converter and editor) ---- */
+.appnav { display: flex; gap: 4px; margin-top: 2px; }
+.appnav a {
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 550;
+}
+.appnav a:hover { color: var(--text); background: var(--accent-soft); }
+.appnav a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }

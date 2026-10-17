@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Image Editor · Ganilues Toolkit</title>
+  <meta name="description" content="A layer-based image editor that runs in your browser: layers, filters, brush, text, shapes, crop and export to many formats.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cpath d='M8 21l5-6 4 4 3-3 4 5z' fill='white'/%3E%3Ccircle cx='21' cy='11' r='2.5' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body class="editor-page">
+  <header class="topbar editor-topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="7" fill="currentColor"/><path d="M8 21l5-6 4 4 3-3 4 5z" fill="#fff"/><circle cx="21" cy="11" r="2.5" fill="#fff"/></svg>
+      </span>
+      <div>
+        <h1>Image Editor</h1>
+        <nav class="appnav" aria-label="Ganilues Toolkit">
+          <a href="index.html">Converter</a>
+          <a href="editor.html" aria-current="page">Editor</a>
+        </nav>
+      </div>
+    </div>
+    <div class="menu">
+      <button type="button" class="btn small" id="act-new">New</button>
+      <button type="button" class="btn small" id="act-open">Open</button>
+      <button type="button" class="btn small" id="act-add" disabled>Add image</button>
+      <span class="menu-sep" aria-hidden="true"></span>
+      <button type="button" class="btn small ghost" id="act-undo" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+      <button type="button" class="btn small ghost" id="act-redo" title="Redo (Ctrl+Shift+Z)" disabled>↷ Redo</button>
+      <span class="menu-sep" aria-hidden="true"></span>
+      <button type="button" class="btn small ghost" id="act-resize" disabled>Image size</button>
+      <button type="button" class="btn small ghost" id="act-canvas" disabled>Canvas size</button>
+      <button type="button" class="btn small ghost" id="act-flatten" disabled>Flatten</button>
+      <button type="button" class="btn small primary" id="act-export" disabled>Export</button>
+    </div>
+    <input type="file" id="open-input" accept="image/*,.tif,.tiff,.ico,.heic,.heif,.avif,.svg" hidden>
+    <input type="file" id="add-input" accept="image/*,.tif,.tiff,.ico,.heic,.heif,.avif,.svg" multiple hidden>
+  </header>
+
+  <div class="optionsbar" id="optionsbar">
+    <div class="opt-group" data-for="move">
+      <span class="opt-hint">Drag to move · corners to resize (Shift = free) · round handle to rotate (Shift = 15° steps)</span>
+    </div>
+    <div class="opt-group" data-for="brush eraser">
+      <label>Size <input type="range" id="brush-size" min="1" max="300" value="24"> <output id="brush-size-out">24</output></label>
+      <label>Opacity <input type="range" id="brush-opacity" min="1" max="100" value="100"> <output id="brush-opacity-out">100%</output></label>
+      <label>Softness <input type="range" id="brush-soft" min="0" max="100" value="0"></label>
+    </div>
+    <div class="opt-group" data-for="shape">
+      <div class="seg" role="radiogroup" aria-label="Shape">
+        <button type="button" class="seg-btn" data-shape="rect" aria-checked="true" role="radio">Rectangle</button>
+        <button type="button" class="seg-btn" data-shape="ellipse" aria-checked="false" role="radio">Ellipse</button>
+      </div>
+      <span class="opt-hint">Drag on the canvas · Shift for square / circle</span>
+    </div>
+    <div class="opt-group" data-for="text">
+      <span class="opt-hint">Click on the canvas to add text, or click existing text to edit it</span>
+    </div>
+    <div class="opt-group" data-for="crop">
+      <span class="opt-hint" id="crop-hint">Drag to choose the area to keep</span>
+      <button type="button" class="btn small primary" id="crop-apply" disabled>Apply crop</button>
+      <button type="button" class="btn small ghost" id="crop-cancel" disabled>Cancel</button>
+    </div>
+    <div class="opt-group" data-for="eyedropper">
+      <span class="opt-hint">Click anywhere on the image to pick a colour</span>
+    </div>
+    <div class="opt-group" data-for="hand">
+      <span class="opt-hint">Drag to pan · Ctrl + scroll to zoom · hold Space with any tool to pan</span>
+    </div>
+    <div class="opt-right">
+      <label class="color-pick" title="Colour for brush, text and shapes">
+        <input type="color" id="primary-color" value="#e11d48">
+      </label>
+      <button type="button" class="btn small ghost" id="zoom-out" aria-label="Zoom out">−</button>
+      <button type="button" class="btn small ghost" id="zoom-label" title="Fit to screen (Ctrl+0)">100%</button>
+      <button type="button" class="btn small ghost" id="zoom-in" aria-label="Zoom in">+</button>
+    </div>
+  </div>
+
+  <main class="editor">
+    <nav class="toolbar" id="toolbar" aria-label="Tools">
+      <button type="button" class="tool" data-tool="move" title="Move & transform (V)" aria-pressed="true">
+        <svg viewBox="0 0 24 24"><path d="M5 3l12 8-5 1.5L9 18z" /></svg><span>Move</span>
+      </button>
+      <button type="button" class="tool" data-tool="brush" title="Brush (B)">
+        <svg viewBox="0 0 24 24"><path d="M14 4l6 6-8.5 8.5a3 3 0 01-2 .9L5 20l.6-4.5a3 3 0 01.9-2z"/></svg><span>Brush</span>
+      </button>
+      <button type="button" class="tool" data-tool="eraser" title="Eraser (E)">
+        <svg viewBox="0 0 24 24"><path d="M15 4l5 5-9 9H6l-3-3zM9 20h11"/></svg><span>Eraser</span>
+      </button>
+      <button type="button" class="tool" data-tool="text" title="Text (T)">
+        <svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span>Text</span>
+      </button>
+      <button type="button" class="tool" data-tool="shape" title="Shapes (U)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="11" height="11" rx="1"/><circle cx="15.5" cy="15.5" r="5.5"/></svg><span>Shape</span>
+      </button>
+      <button type="button" class="tool" data-tool="crop" title="Crop (C)">
+        <svg viewBox="0 0 24 24"><path d="M6 2v16h16M2 6h16v16"/></svg><span>Crop</span>
+      </button>
+      <button type="button" class="tool" data-tool="eyedropper" title="Eyedropper (I)">
+        <svg viewBox="0 0 24 24"><path d="M17 3a3 3 0 014 4l-3 3-4-4zM14 6l-9 9v4h4l9-9"/></svg><span>Picker</span>
+      </button>
+      <button type="button" class="tool" data-tool="hand" title="Hand / pan (H)">
+        <svg viewBox="0 0 24 24"><path d="M8 13V5a1.5 1.5 0 013 0v6-8a1.5 1.5 0 013 0v8-6a1.5 1.5 0 013 0v9a7 7 0 01-7 7h-1a6 6 0 01-5-3l-3-5a1.5 1.5 0 012.5-1.6L8 15"/></svg><span>Hand</span>
+      </button>
+    </nav>
+
+    <section class="stage-wrap" id="stage-wrap" aria-label="Canvas">
+      <canvas id="view"></canvas>
+      <div class="start" id="start-screen">
+        <div class="start-card">
+          <h2>Start editing</h2>
+          <p>Drop an image anywhere on this page, or:</p>
+          <div class="start-actions">
+            <button type="button" class="btn primary" id="start-open">Open an image</button>
+            <button type="button" class="btn" id="start-new">New blank canvas</button>
+          </div>
+          <p class="muted small">Everything stays on your device. Nothing is uploaded.</p>
+        </div>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <aside class="side" id="side">
+      <section class="side-section layers-section" aria-labelledby="layers-title">
+        <div class="layers-head">
+          <h2 id="layers-title">Layers</h2>
+          <div class="layer-tools">
+            <button type="button" class="icon-btn" id="l-add" title="New empty layer" aria-label="New empty layer">＋</button>
+            <button type="button" class="icon-btn" id="l-dup" title="Duplicate layer (Ctrl+J)" aria-label="Duplicate layer">⧉</button>
+            <button type="button" class="icon-btn" id="l-up" title="Move up" aria-label="Move layer up">↑</button>
+            <button type="button" class="icon-btn" id="l-down" title="Move down" aria-label="Move layer down">↓</button>
+            <button type="button" class="icon-btn" id="l-merge" title="Merge down (Ctrl+E)" aria-label="Merge down">⤓</button>
+            <button type="button" class="icon-btn" id="l-del" title="Delete layer (Del)" aria-label="Delete layer">🗑</button>
+          </div>
+        </div>
+        <ul class="layer-list" id="layer-list"></ul>
+        <p class="hint" id="layers-empty">No layers yet.</p>
+      </section>
+
+      <details class="side-section" id="props-section" open>
+        <summary><h2 id="props-title">Document</h2></summary>
+
+        <!-- Document properties (no layer selected) -->
+        <div id="doc-props">
+          <p class="kv"><span>Size</span><strong id="doc-size">-</strong></p>
+          <div class="field-row">
+            <div class="field">
+              <label for="doc-bg">Background</label>
+              <input type="color" id="doc-bg" value="#ffffff">
+            </div>
+            <div class="field">
+              <label for="doc-transparent">Transparent</label>
+              <label class="switch"><input type="checkbox" id="doc-transparent"><span></span></label>
+            </div>
+          </div>
+          <p class="hint">Select a layer to move, transform and adjust it.</p>
+        </div>
+
+        <!-- Layer properties -->
+        <div id="layer-props" hidden>
+          <div class="field-row">
+            <div class="field"><label for="p-x">X</label><input type="number" id="p-x" step="1"></div>
+            <div class="field"><label for="p-y">Y</label><input type="number" id="p-y" step="1"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="p-w">Width</label><input type="number" id="p-w" min="1" step="1"></div>
+            <div class="field"><label for="p-h">Height</label><input type="number" id="p-h" min="1" step="1"></div>
+            <div class="field narrow"><label for="p-lock" title="Keep proportions">Lock</label><label class="switch"><input type="checkbox" id="p-lock" checked><span></span></label></div>
+          </div>
+          <div class="field">
+            <label for="p-rot">Rotation <output id="p-rot-out">0°</output></label>
+            <input type="range" id="p-rot" min="-180" max="180" value="0">
+          </div>
+          <div class="field">
+            <label for="p-opacity">Opacity <output id="p-opacity-out">100%</output></label>
+            <input type="range" id="p-opacity" min="0" max="100" value="100">
+          </div>
+          <div class="field">
+            <label for="p-blend">Blend mode</label>
+            <select id="p-blend"></select>
+          </div>
+          <div class="chips">
+            <button type="button" class="chip" id="p-fliph">⇋ Flip H</button>
+            <button type="button" class="chip" id="p-flipv">⇵ Flip V</button>
+            <button type="button" class="chip" id="p-center">Center</button>
+            <button type="button" class="chip" id="p-fit">Fit to canvas</button>
+            <button type="button" class="chip" id="p-raster" hidden>Rasterize</button>
+          </div>
+
+          <div id="text-props" hidden>
+            <div class="field">
+              <label for="t-text">Text</label>
+              <textarea id="t-text" rows="3"></textarea>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="t-font">Font</label><select id="t-font"></select></div>
+              <div class="field narrow"><label for="t-size">Size</label><input type="number" id="t-size" min="4" max="2000"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="t-color">Colour</label><input type="color" id="t-color"></div>
+              <div class="field"><label for="t-stroke">Outline</label><input type="color" id="t-stroke"></div>
+              <div class="field narrow"><label for="t-stroke-w">Width</label><input type="number" id="t-stroke-w" min="0" max="100"></div>
+            </div>
+            <div class="chips">
+              <button type="button" class="chip" id="t-bold" aria-pressed="false"><b>B</b> Bold</button>
+              <button type="button" class="chip" id="t-italic" aria-pressed="false"><i>I</i> Italic</button>
+              <button type="button" class="chip" data-align="left" aria-pressed="true">Left</button>
+              <button type="button" class="chip" data-align="center" aria-pressed="false">Center</button>
+              <button type="button" class="chip" data-align="right" aria-pressed="false">Right</button>
+            </div>
+          </div>
+
+          <div id="shape-props" hidden>
+            <div class="field-row">
+              <div class="field"><label for="s-fill">Fill</label><input type="color" id="s-fill"></div>
+              <div class="field narrow"><label for="s-fill-on">On</label><label class="switch"><input type="checkbox" id="s-fill-on"><span></span></label></div>
+              <div class="field"><label for="s-stroke">Outline</label><input type="color" id="s-stroke"></div>
+              <div class="field narrow"><label for="s-stroke-w">Width</label><input type="number" id="s-stroke-w" min="0" max="200"></div>
+            </div>
+            <div class="field" id="s-radius-field">
+              <label for="s-radius">Corner radius <output id="s-radius-out">0</output></label>
+              <input type="range" id="s-radius" min="0" max="500" value="0">
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="side-section" id="adjust-section" open>
+        <summary><h2>Filters &amp; adjustments</h2></summary>
+        <p class="hint" id="adjust-empty">Select a layer to apply filters.</p>
+        <div id="adjust-body" hidden>
+          <div class="presets" id="presets"></div>
+          <div id="sliders"></div>
+          <button type="button" class="btn small ghost" id="adjust-reset">Reset adjustments</button>
+        </div>
+      </details>
+
+    </aside>
+  </main>
+
+  <!-- Dialogs -->
+  <dialog id="dlg-new" class="dialog">
+    <form method="dialog">
+      <h2>New canvas</h2>
+      <div class="chips" id="new-presets">
+        <button type="button" class="chip" data-size="1920x1080">1920×1080 HD</button>
+        <button type="button" class="chip" data-size="1080x1080">1080×1080 Square</button>
+        <button type="button" class="chip" data-size="1080x1920">1080×1920 Story</button>
+        <button type="button" class="chip" data-size="2480x3508">A4 @300dpi</button>
+        <button type="button" class="chip" data-size="512x512">512×512 Icon</button>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="new-w">Width (px)</label><input type="number" id="new-w" min="1" max="8192" value="1920"></div>
+        <div class="field"><label for="new-h">Height (px)</label><input type="number" id="new-h" min="1" max="8192" value="1080"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="new-bg">Background</label><input type="color" id="new-bg" value="#ffffff"></div>
+        <div class="field"><label for="new-transparent">Transparent</label><label class="switch"><input type="checkbox" id="new-transparent"><span></span></label></div>
+      </div>
+      <div class="dialog-actions">
+        <button type="submit" class="btn primary" value="ok">Create</button>
+        <button type="submit" class="btn ghost" value="cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-size" class="dialog">
+    <form method="dialog">
+      <h2 id="size-title">Image size</h2>
+      <p class="hint" id="size-desc"></p>
+      <div class="field-row">
+        <div class="field"><label for="size-w">Width (px)</label><input type="number" id="size-w" min="1" max="8192"></div>
+        <div class="field"><label for="size-h">Height (px)</label><input type="number" id="size-h" min="1" max="8192"></div>
+        <div class="field narrow"><label for="size-lock">Lock</label><label class="switch"><input type="checkbox" id="size-lock" checked><span></span></label></div>
+      </div>
+      <div class="dialog-actions">
+        <button type="submit" class="btn primary" value="ok">Apply</button>
+        <button type="submit" class="btn ghost" value="cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-export" class="dialog">
+    <form method="dialog">
+      <h2>Export image</h2>
+      <div class="field">
+        <label for="exp-name">File name</label>
+        <input type="text" id="exp-name" value="edited-image">
+      </div>
+      <div class="format-grid" id="exp-formats" role="radiogroup" aria-label="Format"></div>
+      <p class="hint" id="exp-note"></p>
+      <div class="field" id="exp-quality-field">
+        <label for="exp-quality">Quality <output id="exp-quality-out">90</output></label>
+        <input type="range" id="exp-quality" min="10" max="100" value="90">
+      </div>
+      <div class="field">
+        <label for="exp-scale">Scale <output id="exp-scale-out">100%</output></label>
+        <input type="range" id="exp-scale" min="10" max="200" step="5" value="100">
+      </div>
+      <p class="hint" id="exp-size"></p>
+      <div class="dialog-actions">
+        <button type="submit" class="btn primary" value="ok">Download</button>
+        <button type="submit" class="btn ghost" value="cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/vendor/pako_inflate.min.js"></script>
+  <script src="js/vendor/UTIF.js"></script>
+  <script src="js/detect.js"></script>
+  <script src="js/decode.js"></script>
+  <script src="js/encoders.js"></script>
+  <script src="js/editor/filters.js"></script>
+  <script src="js/editor/layers.js"></script>
+  <script src="js/editor/editor.js"></script>
+</body>
+</html>
