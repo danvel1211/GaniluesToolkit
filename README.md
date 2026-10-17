@@ -52,11 +52,18 @@ Both run entirely in the browser: files never leave your device, there is no ser
 | TIFF | ✅ | ✅ | Opens LZW, Deflate, PackBits and uncompressed TIFFs; saves uncompressed RGBA |
 | ICO | ✅ | ✅ | Saves a multi-size icon (16–256 px), good for favicons |
 | SVG | ✅ | ✅ | Saved SVGs embed the image. They are not traced into vector paths |
-| EPS | ℹ️ info only | ✅ | PostScript Level 2, opens in Illustrator, Photoshop, InDesign, Affinity, etc. |
+| EPS | ✅ see below | ✅ | Saves PostScript Level 2, opens in Illustrator, Photoshop, InDesign, Affinity, etc. |
 | PDF | ℹ️ info only | ✅ | One-page PDF, page size from the DPI setting |
 | AVIF | ✅ | ✅ where supported | Saving depends on the browser (button is greyed out if not available) |
 | HEIC | ✅ in Safari | — | Other browsers can't open HEIC |
 | PSD, PS | ℹ️ info only | — | |
+
+**Opening EPS files.** Browsers can't run PostScript, so the apps show the image stored inside the EPS:
+
+- EPS files saved by this toolkit and **Photoshop EPS** files open at full resolution (RGB, CMYK, greyscale; raw, hex or JPEG-encoded).
+- **Illustrator and most other EPS files** open from their embedded **TIFF preview**. Illustrator adds one by default, usually at 72 ppi, so it's fine for viewing and light edits but isn't the full-quality vector artwork.
+- Files with only a black & white **EPSI preview** open at that preview's resolution.
+- A vector-only EPS with no preview can't be shown. Re-save it from Illustrator with a TIFF preview, or export it as SVG/PDF/PNG.
 
 ## Run it
 
@@ -75,6 +82,7 @@ editor.html         Editor page
 css/editor.css      Editor styling
 js/detect.js        Format detection from magic bytes, EXIF reader
 js/decode.js        Image decoding shared by both apps
+js/eps.js           EPS reader (embedded image / TIFF preview / EPSI preview)
 js/encoders.js      Output encoders (BMP, TIFF, ICO, GIF, EPS, PDF and SVG are written by hand; the rest use the browser)
 js/app.js           Converter UI, preview, resize/rotate pipeline, conversion
 js/editor/filters.js  Adjustments engine (colour matrix, blur, sharpen, vignette)
@@ -86,7 +94,7 @@ js/vendor/          UTIF.js (TIFF decoding) and pako (Deflate), both MIT-license
 ## Limitations
 
 - **Raster to vector:** EPS, PDF and SVG output contain the original pixels. Turning a photo or logo into real vector paths (tracing) is a separate feature that could be added later.
-- **Opening EPS/PDF/PSD** files as images would need a much heavier engine (e.g. Ghostscript compiled to WebAssembly). The app shows their file details but cannot preview them.
+- **Rendering EPS vector artwork** (rather than its preview) and opening PDF/PSD would need a much heavier engine (e.g. Ghostscript compiled to WebAssembly).
 - **Animated GIF/WebP:** only the first frame is converted.
 - **Size:** very large images are capped at 16,384 px per side in the converter and 8,192 px in the editor (browser canvas limits).
 - **Editor projects** aren't saved between visits yet. Export your result before closing the tab (the page warns you).

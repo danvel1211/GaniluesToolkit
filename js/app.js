@@ -109,6 +109,7 @@
         item.width = img.width;
         item.height = img.height;
         item.pages = img.pages;
+        item.note = img.note;
         item.objectUrl = img.url;
         item.hasAlpha = detectAlpha(item);
         item.thumb = makeThumb(item);
@@ -268,9 +269,10 @@
     }
     if (item.file.lastModified) rows.push(['Modified', new Date(item.file.lastModified).toLocaleString()]);
     if (item.exif) Object.keys(item.exif).forEach(function (k) { rows.push([k, item.exif[k]]); });
+    if (item.note) rows.push(['Note', item.note]);
     if (item.error) rows.push(['Status', item.error]);
     tbody.innerHTML = rows.map(function (r) {
-      var cls = r[0] === 'Warning' || r[0] === 'Status' ? ' class="warn"' : '';
+      var cls = r[0] === 'Warning' || r[0] === 'Status' || r[0] === 'Note' ? ' class="warn"' : '';
       return '<tr' + cls + '><th scope="row">' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(r[1]) + '</td></tr>';
     }).join('');
   }

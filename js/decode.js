@@ -43,7 +43,12 @@
     if (format.id === 'tiff') {
       return Promise.resolve().then(function () { return decodeTiff(bytes); });
     }
-    if (format.id === 'pdf' || format.id === 'eps' || format.id === 'ps' || format.id === 'psd') {
+    if (format.id === 'eps' || format.id === 'ps') {
+      return EpsDecode.decode(bytes).then(function (r) {
+        return { source: r.canvas, width: r.canvas.width, height: r.canvas.height, note: r.note };
+      });
+    }
+    if (format.id === 'pdf' || format.id === 'psd') {
       return Promise.reject(new Error(format.name + ' files can be inspected but not opened as images in the browser.'));
     }
     var blob = file;

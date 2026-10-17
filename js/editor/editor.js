@@ -337,7 +337,7 @@
     toast('Opening ' + files.length + ' image' + (files.length > 1 ? 's' : '') + '…');
     Promise.all(files.map(function (f) {
       return ImageDecode.load(f).then(function (img) {
-        return { name: f.name || 'Pasted image', canvas: sourceToCanvas(img) };
+        return { name: f.name || 'Pasted image', canvas: sourceToCanvas(img), note: img.note };
       }, function (err) {
         toast((f.name || 'File') + ': ' + err.message);
         return null;
@@ -360,7 +360,9 @@
       });
       commit();
       requestRender();
-      toast(loaded.length === 1 ? 'Added "' + loaded[0].name + '"' : 'Added ' + loaded.length + ' images as layers');
+      var notes = loaded.filter(function (item) { return item.note; });
+      if (notes.length) toast(notes[0].name + ': ' + notes[0].note);
+      else toast(loaded.length === 1 ? 'Added "' + loaded[0].name + '"' : 'Added ' + loaded.length + ' images as layers');
     });
   }
 

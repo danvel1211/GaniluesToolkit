@@ -36,8 +36,8 @@
       <button type="button" class="btn small ghost" id="act-flatten" disabled>Flatten</button>
       <button type="button" class="btn small primary" id="act-export" disabled>Export</button>
     </div>
-    <input type="file" id="open-input" accept="image/*,.tif,.tiff,.ico,.heic,.heif,.avif,.svg" hidden>
-    <input type="file" id="add-input" accept="image/*,.tif,.tiff,.ico,.heic,.heif,.avif,.svg" multiple hidden>
+    <input type="file" id="open-input" accept="image/*,.tif,.tiff,.ico,.heic,.heif,.avif,.svg,.eps,.epsf,.epsi,.ps" hidden>
+    <input type="file" id="add-input" accept="image/*,.tif,.tiff,.ico,.heic,.heif,.avif,.svg,.eps,.epsf,.epsi,.ps" multiple hidden>
   </header>
 
   <div class="optionsbar" id="optionsbar">
@@ -312,6 +312,7 @@
   <script src="js/vendor/pako_inflate.min.js"></script>
   <script src="js/vendor/UTIF.js"></script>
   <script src="js/detect.js"></script>
+  <script src="js/eps.js"></script>
   <script src="js/decode.js"></script>
   <script src="js/encoders.js"></script>
   <script src="js/editor/filters.js"></script>
