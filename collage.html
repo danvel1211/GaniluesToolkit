@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Privacy: nothing may be loaded from or sent to the internet; everything ships with the app. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self' data: blob:; media-src 'self' data: blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Collage Maker · Off the Clock Creative Suite</title>
+  <meta name="description" content="Make photo collages and grids with adjustable spacing, borders and rounded corners, right in your browser. Nothing is uploaded.">
+  <!-- brand-favicon -->
+  <script src="js/theme.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- brand-head -->
+  <link rel="stylesheet" href="css/collage.css">
+</head>
+<body class="collage-page">
+  <header class="topbar">
+    <div class="brand">
+      <!-- brand-logo -->
+      <div>
+        <h1>Collage Maker</h1>
+        <nav class="appnav" aria-label="Off the Clock Creative Suite">
+          <a href="index.html">Home</a>
+          <a href="pdf.html">Combine</a>
+          <a href="sign.html">Sign</a>
+          <a href="editor.html">Editor</a>
+          <a href="collage.html" aria-current="page">Collage</a>
+          <a href="converter.html">Converter</a>
+          <!-- brand-nav -->
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="collage-layout">
+    <!-- Photos & layouts -->
+    <aside class="panel collage-side" aria-label="Photos and layouts">
+      <h2>Photos</h2>
+      <label class="dropzone" id="dropzone" tabindex="0">
+        <input type="file" id="file-input" multiple accept="image/*">
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <strong>Add photos</strong>
+        <span>drop them here or click to browse</span>
+      </label>
+      <div class="photo-strip" id="photo-strip" aria-label="Added photos"></div>
+      <div class="row gap" id="photo-actions" hidden>
+        <button type="button" class="btn small ghost" id="shuffle">Shuffle</button>
+        <button type="button" class="btn small ghost" id="clear-photos">Remove all</button>
+      </div>
+
+      <h2 class="section-title">Layout</h2>
+      <div class="layout-filter" role="group" aria-label="Number of photos">
+        <button type="button" class="chip" data-count="all" aria-pressed="true">All</button>
+        <button type="button" class="chip" data-count="2" aria-pressed="false">2</button>
+        <button type="button" class="chip" data-count="3" aria-pressed="false">3</button>
+        <button type="button" class="chip" data-count="4" aria-pressed="false">4</button>
+        <button type="button" class="chip" data-count="5" aria-pressed="false">5–6</button>
+        <button type="button" class="chip" data-count="9" aria-pressed="false">7–9</button>
+      </div>
+      <div class="layout-grid" id="layout-grid" role="radiogroup" aria-label="Layouts"></div>
+    </aside>
+
+    <!-- Canvas -->
+    <section class="collage-stage-wrap" aria-label="Collage preview">
+      <div class="collage-stage" id="stage">
+        <canvas id="collage" aria-label="Collage preview"></canvas>
+      </div>
+      <p class="stage-caption" id="caption">Drag photos between cells to swap them · drag inside a cell to reposition · scroll or use the slider to zoom</p>
+    </section>
+
+    <!-- Settings -->
+    <aside class="panel collage-side" aria-label="Collage settings">
+      <h2>Canvas</h2>
+      <div class="field">
+        <label for="size-preset">Size</label>
+        <select id="size-preset">
+          <option value="1080x1080">Square · 1080 × 1080 (Instagram post)</option>
+          <option value="1080x1350">Portrait · 1080 × 1350 (Instagram 4:5)</option>
+          <option value="1080x1920">Story · 1080 × 1920 (Stories, Reels, TikTok)</option>
+          <option value="1920x1080">Landscape · 1920 × 1080 (HD, YouTube)</option>
+          <option value="1500x500">Banner · 1500 × 500 (X / Twitter header)</option>
+          <option value="2480x3508">A4 print · 2480 × 3508 (300 dpi)</option>
+          <option value="3600x2400">Photo print 6 × 4 in · 3600 × 2400 (600 dpi)</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="field-row" id="custom-size" hidden>
+        <div class="field"><label for="custom-w">Width</label><input type="number" id="custom-w" min="100" max="8000" value="2000"></div>
+        <div class="field"><label for="custom-h">Height</label><input type="number" id="custom-h" min="100" max="8000" value="2000"></div>
+      </div>
+
+      <h2 class="section-title">Style</h2>
+      <div class="field">
+        <label for="gap">Spacing <output id="gap-out">16</output></label>
+        <input type="range" id="gap" min="0" max="80" value="16">
+      </div>
+      <div class="field">
+        <label for="border">Outer border <output id="border-out">16</output></label>
+        <input type="range" id="border" min="0" max="120" value="16">
+      </div>
+      <div class="field">
+        <label for="radius">Corner radius <output id="radius-out">12</output></label>
+        <input type="range" id="radius" min="0" max="120" value="12">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="bg">Background</label>
+          <input type="color" id="bg" value="#ffffff">
+        </div>
+        <div class="field">
+          <label for="bg-none">Transparent</label>
+          <label class="switch"><input type="checkbox" id="bg-none"><span></span></label>
+        </div>
+      </div>
+
+      <div id="cell-panel" hidden>
+        <h2 class="section-title">Selected photo</h2>
+        <div class="field">
+          <label for="zoom">Zoom <output id="zoom-out">100%</output></label>
+          <input type="range" id="zoom" min="100" max="400" value="100">
+        </div>
+        <div class="chips">
+          <button type="button" class="chip" id="cell-center">Re-centre</button>
+          <button type="button" class="chip" id="cell-replace">Replace photo</button>
+          <button type="button" class="chip" id="cell-clear">Empty cell</button>
+        </div>
+        <input type="file" id="cell-input" accept="image/*" hidden>
+      </div>
+
+      <h2 class="section-title">Export</h2>
+      <div class="format-grid compact" id="formats" role="radiogroup" aria-label="Format"></div>
+      <div class="field" id="quality-field">
+        <label for="quality">Quality <output id="quality-out">92</output></label>
+        <input type="range" id="quality" min="40" max="100" value="92">
+      </div>
+      <div class="field">
+        <label for="out-name">File name</label>
+        <input type="text" id="out-name" value="collage">
+      </div>
+      <button type="button" class="btn primary export-btn" id="export">Download collage</button>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="js/encoders.js"></script>
+  <script src="js/theme-toggle.js"></script>
+  <script src="js/collage.js"></script>
+</body>
+</html>
