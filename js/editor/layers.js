@@ -67,11 +67,14 @@
     l.align = opts.align || 'left';
     l.strokeColor = opts.strokeColor || '#ffffff';
     l.strokeWidth = opts.strokeWidth || 0;
+    l.vertical = !!opts.vertical;
     return l;
   }
 
+  var SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', triangle: 'Triangle', star: 'Star' };
+
   function createShape(kind, x, y, w, h, opts) {
-    var l = base('shape', kind === 'ellipse' ? 'Ellipse' : 'Rectangle', x, y);
+    var l = base('shape', SHAPE_NAMES[kind] || 'Shape', x, y);
     l.shape = kind;
     l.w = Math.max(1, w);
     l.h = Math.max(1, h);
@@ -80,6 +83,7 @@
     l.strokeColor = opts.strokeColor || '#111111';
     l.strokeWidth = opts.strokeWidth || 0;
     l.radius = opts.radius || 0;
+    l.points = opts.points || 5;
     return l;
   }
 
@@ -116,12 +120,53 @@
 
   var measureCtx = document.createElement('canvas').getContext('2d');
 
+  var LINE_HEIGHT = 1.25;
+
+  // Space around the glyphs so outlines and descenders aren't clipped.
+  function textPadding(l) {
+    return Math.ceil(l.fontSize * 0.2 + l.strokeWidth);
+  }
+
+  function drawGlyphs(ctx, l, str, x, y) {
+    if (l.strokeWidth > 0) {
+      ctx.strokeStyle = l.strokeColor;
+      ctx.lineWidth = l.strokeWidth * 2;
+      ctx.strokeText(str, x, y);
+    }
+    ctx.fillStyle = l.color;
+    ctx.fillText(str, x, y);
+  }
+
+  // Vertical text: upright characters stacked top to bottom, lines run right to left.
+  function renderVerticalText(l) {
+    var cols = String(l.text || ' ').split('\n').map(function (s) { return Array.from(s || ' '); });
+    var maxLen = Math.max.apply(null, cols.map(function (c) { return c.length; }));
+    var colWidth = l.fontSize * LINE_HEIGHT, pad = textPadding(l);
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(cols.length * colWidth + pad * 2));
+    c.height = Math.max(1, Math.ceil(maxLen * l.fontSize + pad * 2));
+    var ctx = c.getContext('2d');
+    ctx.font = fontString(l);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    cols.forEach(function (chars, i) {
+      var cx = c.width - pad - colWidth * (i + 0.5);
+      var offset = l.align === 'center' ? (maxLen - chars.length) / 2 : l.align === 'right' ? maxLen - chars.length : 0;
+      chars.forEach(function (ch, j) {
+        drawGlyphs(ctx, l, ch, cx, pad + (offset + j + 0.5) * l.fontSize);
+      });
+    });
+    return c;
+  }
+
   function renderText(l) {
+    if (l.vertical) return renderVerticalText(l);
     var lines = String(l.text || ' ').split('\n');
     measureCtx.font = fontString(l);
     var widths = lines.map(function (s) { return measureCtx.measureText(s || ' ').width; });
-    var lineHeight = l.fontSize * 1.25;
-    var pad = Math.ceil(l.fontSize * 0.2 + l.strokeWidth);
+    var lineHeight = l.fontSize * LINE_HEIGHT;
+    var pad = textPadding(l);
     var w = Math.max(1, Math.ceil(Math.max.apply(null, widths) + pad * 2));
     var h = Math.max(1, Math.ceil(lines.length * lineHeight + pad * 2));
     var c = document.createElement('canvas');
@@ -134,14 +179,7 @@
     ctx.lineJoin = 'round';
     var x = l.align === 'center' ? w / 2 : l.align === 'right' ? w - pad : pad;
     lines.forEach(function (line, i) {
-      var y = pad + lineHeight * (i + 0.5);
-      if (l.strokeWidth > 0) {
-        ctx.strokeStyle = l.strokeColor;
-        ctx.lineWidth = l.strokeWidth * 2;
-        ctx.strokeText(line, x, y);
-      }
-      ctx.fillStyle = l.color;
-      ctx.fillText(line, x, y);
+      drawGlyphs(ctx, l, line, x, pad + lineHeight * (i + 0.5));
     });
     return c;
   }
@@ -157,6 +195,22 @@
     ctx.beginPath();
     if (l.shape === 'ellipse') {
       ctx.ellipse(w / 2, h / 2, iw / 2, ih / 2, 0, 0, Math.PI * 2);
+    } else if (l.shape === 'line') {
+      // A line is a bar with round ends; its length is w and its weight is h.
+      ctx.roundRect ? ctx.roundRect(x, y, iw, ih, ih / 2) : ctx.rect(x, y, iw, ih);
+    } else if (l.shape === 'triangle') {
+      ctx.moveTo(w / 2, y);
+      ctx.lineTo(x + iw, y + ih);
+      ctx.lineTo(x, y + ih);
+      ctx.closePath();
+    } else if (l.shape === 'star') {
+      var n = Math.max(3, l.points || 5);
+      for (var i = 0; i < n * 2; i++) {
+        var a = -Math.PI / 2 + (i * Math.PI) / n, k = i % 2 ? 0.45 : 1;
+        var px = w / 2 + Math.cos(a) * (iw / 2) * k, py = h / 2 + Math.sin(a) * (ih / 2) * k;
+        if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+      ctx.closePath();
     } else {
       var r = Math.min(l.radius || 0, iw / 2, ih / 2);
       ctx.moveTo(x + r, y);
@@ -180,10 +234,10 @@
 
   function contentKey(l) {
     if (l.type === 'text') {
-      return [l.text, fontString(l), l.color, l.align, l.strokeColor, l.strokeWidth].join('|');
+      return [l.text, fontString(l), l.color, l.align, l.strokeColor, l.strokeWidth, l.vertical].join('|');
     }
     if (l.type === 'shape') {
-      return [l.shape, l.w, l.h, l.fill, l.fillEnabled, l.strokeColor, l.strokeWidth, l.radius].join('|');
+      return [l.shape, l.w, l.h, l.fill, l.fillEnabled, l.strokeColor, l.strokeWidth, l.radius, l.points].join('|');
     }
     return '';
   }
@@ -286,6 +340,9 @@
   global.Layers = {
     BLEND_MODES: BLEND_MODES,
     FONTS: FONTS,
+    LINE_HEIGHT: LINE_HEIGHT,
+    fontString: fontString,
+    textPadding: textPadding,
     createImage: createImage,
     createEmpty: createEmpty,
     createText: createText,

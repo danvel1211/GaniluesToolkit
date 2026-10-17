@@ -37,20 +37,30 @@
 .opt-hint { color: var(--muted); }
 .opt-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 
-.color-pick input {
-  width: 34px; height: 30px;
+.swatches { display: flex; align-items: center; gap: 2px; margin-right: 8px; }
+.swatches input[type="color"] {
+  width: 30px; height: 28px;
   padding: 2px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--panel);
   cursor: pointer;
-  margin-right: 8px;
 }
 
-.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.seg-btn { border: 0; background: var(--panel); padding: 5px 10px; cursor: pointer; font-size: 12px; }
-.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
-.seg-btn[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.swatches .swap { width: 24px; height: 24px; font-size: 14px; }
+.opt-group input[type="number"] {
+  width: 60px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.opt-group select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
 
 /* ---- main area ---- */
 .editor {
@@ -92,6 +102,55 @@
 }
 .tool:hover { background: var(--accent-soft); color: var(--text); }
 .tool[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.tool { position: relative; }
+.flyout-mark {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-bottom: 6px solid currentColor;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.flyout-mark::after { content: ""; position: absolute; right: -4px; bottom: -10px; width: 14px; height: 14px; } /* bigger hit area */
+
+.flyout {
+  position: fixed;
+  z-index: 50;
+  min-width: 220px;
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+.flyout-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+}
+.flyout-item:hover, .flyout-item:focus-visible { background: var(--accent-soft); outline: none; }
+.flyout-item[aria-checked="true"] { color: var(--accent); font-weight: 600; }
+.flyout-item svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.flyout-item .check { width: 10px; font-size: 8px; flex: none; }
+.flyout-name { flex: 1; }
+.flyout-item kbd {
+  font: 11px ui-monospace, monospace;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+}
 
 .stage-wrap {
   position: relative;
@@ -104,9 +163,20 @@
 .stage-wrap canvas { position: absolute; inset: 0; display: block; }
 .stage-wrap[data-tool="move"] canvas { cursor: default; }
 .stage-wrap[data-tool="brush"] canvas,
-.stage-wrap[data-tool="eraser"] canvas { cursor: crosshair; }
-.stage-wrap[data-tool="text"] canvas { cursor: text; }
-.stage-wrap[data-tool="shape"] canvas,
+.stage-wrap[data-tool="pencil"] canvas,
+.stage-wrap[data-tool="spray"] canvas,
+.stage-wrap[data-tool="eraser"] canvas,
+.stage-wrap[data-tool="bucket"] canvas,
+.stage-wrap[data-tool="magic-eraser"] canvas,
+.stage-wrap[data-tool="gradient"] canvas { cursor: crosshair; }
+.stage-wrap[data-tool="text"] canvas,
+.stage-wrap[data-tool="text-vertical"] canvas { cursor: text; }
+.stage-wrap[data-tool="zoom"] canvas { cursor: zoom-in; }
+.stage-wrap[data-tool="rect"] canvas,
+.stage-wrap[data-tool="ellipse"] canvas,
+.stage-wrap[data-tool="line"] canvas,
+.stage-wrap[data-tool="triangle"] canvas,
+.stage-wrap[data-tool="star"] canvas,
 .stage-wrap[data-tool="crop"] canvas,
 .stage-wrap[data-tool="eyedropper"] canvas { cursor: crosshair; }
 .stage-wrap[data-tool="hand"] canvas,
@@ -160,6 +230,25 @@
   font-size: 13px;
   pointer-events: none;
 }
+
+/* On-canvas text editing: a textarea laid exactly over the text layer. */
+.text-editor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  margin: 0;
+  border: 0;
+  outline: 1px dashed var(--accent);
+  outline-offset: 0;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  z-index: 2;
+}
+.text-editor::selection { background: rgba(79, 70, 229, 0.35); }
+.text-editor.vertical { writing-mode: vertical-rl; text-orientation: upright; }
 
 /* ---- side panel ---- */
 .side {
