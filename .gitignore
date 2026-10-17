@@ -2,3 +2,4 @@ dist/
 # Never commit licence code lists: only their fingerprints belong in the repo.
 *licence codes*
 *license codes*
+out/
