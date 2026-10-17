@@ -32,6 +32,15 @@ Studiolo/
 
 An `.html` file always shows the default browser's icon on Windows, so the Studiolo icon (`brands/studiolo/Studiolo.ico`, designed in `app-icon.svg`) is applied by `Add Studiolo to Desktop.cmd`. Run once, it creates Desktop and Start-menu shortcuts to `Studiolo.html` with the icon and gives the folder the icon via a hidden `desktop.ini`. It's a plain-text script that installs and downloads nothing. Inside the app, the icon is also the browser-tab icon.
 
+### Studiolo licensing
+
+Studiolo is locked until the user enters **their name and a licence code** (like `7KQ2-M9XA-P4TD-WZ3R`). The name personalises the app ("Good evening, Maria", "Licensed to Maria Santos"); the code unlocks it. Off the Clock Creative Suite has no licensing.
+
+- **How codes are checked:** the app holds only one-way fingerprints of the codes (`brands/studiolo/license-codes.js`, SHA-512 with a per-batch salt), never the codes themselves, so they can't be read out of the files. Each code is 16 random characters (80 bits), far too many to guess. Checking happens offline.
+- **Making codes:** `python3 tools/make_license_batch.py --count 1000 --out "<private folder outside this project>"` creates a new batch: the real codes go to a spreadsheet and CSV in that folder (keep them private), and their fingerprints are added to the app. Rebuild with `tools/build_editions.py` and ship the update; older codes keep working. The script refuses to write codes inside the project.
+- **Activation** is remembered in the browser. The About page shows the licence, lets the user change their name, and can remove the licence from that browser.
+- **Limits of offline licensing:** the name isn't tied to the code (codes are made before names are known; your spreadsheet records who got which code), one code can be shared between people, codes can't be cancelled remotely, and someone with programming skills could remove the check from the code. Stopping those would need an online licence server, which would break the no-internet design.
+
 Studiolo also has an **About** page (`brands/studiolo/about.html`, with `about.css` and `about.js`) crediting its creator, Daniel Velasquez. It's linked from every Studiolo page and the home screen. Pages and links that belong to one edition are listed under `extraFiles` and `navLinks` in `brands/editions.json`.
 
 The files in this folder are the Off the Clock Creative Suite edition. To build both editions as ready-to-share folders and ZIP files in `dist/`, run:
@@ -203,6 +212,7 @@ All bundled in `js/vendor/` and `fonts/` with their licence files. Every licence
 | [UTIF.js](https://github.com/photopea/UTIF.js) 3.1 | Reading TIFF files | MIT |
 | [pako](https://github.com/nodeca/pako) 1.0 | Deflate decompression for TIFF | MIT |
 | Dancing Script, Great Vibes, Allura, Caveat (in `fonts/`) | Typed signature styles | SIL Open Font License 1.1 |
+| [TweetNaCl.js](https://github.com/dchest/tweetnacl-js) 1.0 (Studiolo only) | Fingerprinting licence codes (SHA-512) | Public domain (Unlicense) |
 
 Everything else (encoders, editor, object removal, EPS reader) is original code in this repository.
 

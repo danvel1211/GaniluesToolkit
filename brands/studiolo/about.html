@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-license="optional">
 <head>
   <meta charset="utf-8">
   <!-- Privacy: nothing may be loaded from or sent to the internet; everything ships with the app. -->
@@ -12,6 +12,10 @@
   <script src="js/theme.js"></script>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/about.css">
+  <link rel="stylesheet" href="css/license.css">
+  <script src="js/vendor/nacl-fast.min.js"></script>
+  <script src="js/license-codes.js"></script>
+  <script src="js/license.js"></script>
 </head>
 <body class="about-page">
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -118,6 +122,18 @@
           <h3>Free to use</h3>
           <p>Built on open libraries with permissive licences (pdf.js, pdf-lib and others), so anyone can use it.</p>
         </div>
+      </div>
+    </section>
+
+    <!-- Licence -->
+    <section class="section" aria-labelledby="licence-title">
+      <div class="glass licence-panel reveal" id="licence-panel">
+        <div>
+          <span class="eyebrow">Your licence</span>
+          <h3 id="licence-title">Checking…</h3>
+          <p id="licence-detail"></p>
+        </div>
+        <div class="creator-actions" id="licence-actions"></div>
       </div>
     </section>
 

@@ -44,6 +44,8 @@ def brand_text(text, ed, svg):
         else:
             icon = svg.replace('fill="currentColor"', 'fill="#ea580c"')
             text = text.replace('<!-- brand-favicon -->', '<link rel="icon" href="data:image/svg+xml,%s">' % urllib.parse.quote(icon))
+    if ed.get('headHtml'):
+        text = text.replace('<!-- brand-head -->', ed['headHtml'])
     for link in ed.get('navLinks', []):
         text = text.replace('<!-- brand-nav -->', '<a href="%s">%s</a>\n          <!-- brand-nav -->' % (link['href'], link['label']))
         text = text.replace('<!-- brand-home-link -->', ' <a class="home-link" href="%s">%s</a><!-- brand-home-link -->' % (link['href'], link['homeLabel']))

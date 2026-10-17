@@ -1,0 +1,98 @@
+/* Studiolo activation screen. */
+
+/* Until a valid code is entered, only the activation screen is shown. */
+html.license-locked body > *:not(#license-gate):not(svg) { visibility: hidden !important; }
+html.license-locked body { overflow: hidden; }
+
+#license-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow-y: auto;
+  background:
+    radial-gradient(700px 420px at 15% 0%, color-mix(in srgb, var(--logo-a, #f59e0b) 22%, transparent), transparent 65%),
+    radial-gradient(700px 420px at 100% 100%, color-mix(in srgb, var(--logo-b, #e11d48) 20%, transparent), transparent 65%),
+    var(--bg);
+  visibility: visible;
+}
+.license-card {
+  width: min(460px, 100%);
+  padding: 32px 28px 24px;
+  text-align: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-lg);
+}
+.license-logo { width: 72px; height: 72px; display: block; margin: 0 auto 14px; filter: drop-shadow(0 10px 24px rgba(234, 88, 12, 0.35)); }
+.license-card h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.02em; text-transform: none; color: var(--text); }
+.license-lead { margin: 0 0 18px; color: var(--muted); }
+.license-form { text-align: left; }
+.license-form label { display: block; margin: 12px 0 6px; font-size: 13px; font-weight: 600; }
+.license-form label:first-child { margin-top: 0; }
+#license-name {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 15px;
+}
+#license-name:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+#license-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  resize: vertical;
+  word-break: break-all;
+}
+#license-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.license-msg { min-height: 20px; margin: 8px 0; font-size: 13px; color: #22c55e; }
+.license-msg.error { color: var(--danger); }
+.license-btn { width: 100%; padding: 12px; font-size: 15px; border-radius: 12px; }
+.license-help { margin: 18px 0 0; font-size: 13px; color: var(--muted); }
+.license-help a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.license-help a:hover { text-decoration: underline; }
+.license-fine { margin: 10px 0 0; font-size: 12px; color: var(--muted); opacity: 0.8; }
+
+.license-badge {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--muted);
+  font-size: 12px;
+}
+.license-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+
+/* About page licence panel */
+.licence-panel { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 22px 26px; }
+.licence-panel h3 { margin: 0 0 4px; font-size: 17px; }
+.licence-panel p { margin: 0; color: var(--muted); }
+
+.license-welcome {
+  margin: 0 0 4px !important;
+  font-size: 18px !important;
+  font-weight: 650;
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
