@@ -101,7 +101,7 @@
   stroke-linejoin: round;
 }
 .tool:hover { background: var(--accent-soft); color: var(--text); }
-.tool[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.tool[aria-pressed="true"] { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 18%, transparent); }
 .tool { position: relative; }
 .flyout-mark {
   position: absolute;
@@ -157,7 +157,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--stage);
   touch-action: none;
 }
 .stage-wrap canvas { position: absolute; inset: 0; display: block; }

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Privacy: nothing may be loaded from or sent to the internet; everything ships with the app. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self' data: blob:; media-src 'self' data: blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File Combination · Ganilues Toolkit</title>
+  <meta name="description" content="Combine PDFs and images into one PDF and arrange the pages, right in your browser. Nothing is uploaded.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cpath d='M8 21l5-6 4 4 3-3 4 5z' fill='white'/%3E%3Ccircle cx='21' cy='11' r='2.5' fill='white'/%3E%3C/svg%3E">
+  <script src="js/theme.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/pdf.css">
+</head>
+<body class="pdf-page">
+  <header class="topbar">
+    <div class="brand">
+      <a class="logo" href="index.html" aria-label="Ganilues Toolkit home">
+        <svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="7" fill="currentColor"/><path d="M8 21l5-6 4 4 3-3 4 5z" fill="#fff"/><circle cx="21" cy="11" r="2.5" fill="#fff"/></svg>
+      </a>
+      <div>
+        <h1>File Combination</h1>
+        <nav class="appnav" aria-label="Ganilues Toolkit">
+          <a href="index.html">Home</a>
+          <a href="pdf.html" aria-current="page">Combine</a>
+          <a href="editor.html">Editor</a>
+          <a href="converter.html">Converter</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="pdf-layout">
+    <!-- Source files -->
+    <aside class="panel pdf-files" aria-labelledby="files-title">
+      <h2 id="files-title">Files</h2>
+      <label class="dropzone" id="dropzone" tabindex="0">
+        <input type="file" id="file-input" multiple accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,image/gif,image/bmp">
+        <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <strong>Drop PDFs or images</strong>
+        <span>or click to browse</span>
+      </label>
+      <ul class="pdf-file-list" id="file-list" aria-label="Added files"></ul>
+      <p class="hint" id="files-hint">Pages from every file appear on the right, in the order you add them.</p>
+    </aside>
+
+    <!-- Pages -->
+    <section class="panel pdf-pages" aria-labelledby="pages-title">
+      <div class="pages-toolbar">
+        <h2 id="pages-title">Pages <span class="count" id="page-count"></span></h2>
+        <div class="pages-actions" role="toolbar" aria-label="Page actions">
+          <button type="button" class="btn small ghost" id="act-select-all" title="Select all (Ctrl+A)">Select all</button>
+          <span class="tb-sep" aria-hidden="true"></span>
+          <button type="button" class="icon-btn" id="act-rot-left" title="Rotate left" aria-label="Rotate selected pages left">⟲</button>
+          <button type="button" class="icon-btn" id="act-rot-right" title="Rotate right (R)" aria-label="Rotate selected pages right">⟳</button>
+          <button type="button" class="icon-btn" id="act-earlier" title="Move earlier (Alt+←)" aria-label="Move selected pages earlier">←</button>
+          <button type="button" class="icon-btn" id="act-later" title="Move later (Alt+→)" aria-label="Move selected pages later">→</button>
+          <button type="button" class="icon-btn" id="act-dup" title="Duplicate (Ctrl+D)" aria-label="Duplicate selected pages">⧉</button>
+          <button type="button" class="icon-btn danger" id="act-delete" title="Delete (Del)" aria-label="Delete selected pages">🗑</button>
+          <span class="tb-sep" aria-hidden="true"></span>
+          <button type="button" class="btn small ghost" id="act-reverse" title="Reverse page order">Reverse</button>
+          <button type="button" class="btn small ghost" id="act-reset" title="Back to the original order of all pages">Reset</button>
+          <label class="thumb-size" title="Thumbnail size">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+            <input type="range" id="thumb-size" min="110" max="260" value="160" aria-label="Thumbnail size">
+          </label>
+        </div>
+      </div>
+      <div class="page-grid-wrap" id="grid-wrap">
+        <div class="pdf-empty" id="empty-state">
+          <div class="pdf-empty-art" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <p><strong>Add two or more files to combine them</strong></p>
+          <p>Drag pages to reorder them. Click to select, Shift or Ctrl+click to select several. Double-click to preview.</p>
+        </div>
+        <ol class="page-grid" id="page-grid" aria-label="Pages in the combined PDF"></ol>
+      </div>
+      <p class="selection-bar" id="selection-bar" aria-live="polite"></p>
+    </section>
+
+    <!-- Output -->
+    <aside class="panel pdf-output" aria-labelledby="out-title">
+      <h2 id="out-title">Combined PDF</h2>
+      <div class="summary" id="summary">
+        <div><strong id="sum-pages">0</strong><span>pages</span></div>
+        <div><strong id="sum-files">0</strong><span>files</span></div>
+      </div>
+      <div class="field">
+        <label for="out-name">File name</label>
+        <input type="text" id="out-name" value="combined">
+      </div>
+      <div class="field">
+        <label for="img-size">Image pages</label>
+        <select id="img-size">
+          <option value="a4">Fit on A4 page</option>
+          <option value="letter">Fit on Letter page</option>
+          <option value="image">Same size as the image</option>
+        </select>
+      </div>
+      <div class="out-actions">
+        <button type="button" class="btn primary" id="download-all" disabled>Download combined PDF</button>
+        <button type="button" class="btn" id="download-selected" disabled>Download selected pages only</button>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <ul class="tips">
+        <li><kbd>Del</kbd> deletes, <kbd>R</kbd> rotates, <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> moves the selected pages</li>
+        <li>Double-click a page to see it larger</li>
+        <li>"Selected pages only" also works for splitting a PDF</li>
+      </ul>
+    </aside>
+  </main>
+
+  <dialog id="preview" class="preview-dialog">
+    <div class="preview-head">
+      <strong id="preview-title">Page</strong>
+      <div class="preview-nav">
+        <button type="button" class="icon-btn" id="preview-prev" aria-label="Previous page">‹</button>
+        <button type="button" class="icon-btn" id="preview-next" aria-label="Next page">›</button>
+        <button type="button" class="icon-btn" id="preview-close" aria-label="Close">×</button>
+      </div>
+    </div>
+    <div class="preview-body"><canvas id="preview-canvas"></canvas></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="js/vendor/pdf.min.js"></script>
+  <script src="js/vendor/pdf.worker.min.js"></script>
+  <script src="js/vendor/pdf-lib.min.js"></script>
+  <script src="js/theme-toggle.js"></script>
+  <script src="js/pdf/combine.js"></script>
+</body>
+</html>

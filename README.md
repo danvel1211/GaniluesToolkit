@@ -1,11 +1,27 @@
-# Ganilues Toolkit · Image Converter & Editor
+# Ganilues Toolkit
 
-Two standalone web apps for working with images:
+A set of standalone web tools for working with files. Open `index.html` to get the home screen:
 
-- **Converter** (`index.html`): convert, view, inspect and resize images, one at a time or in batches.
-- **Editor** (`editor.html`): a layer-based image editor with selections, object removal, filters, painting, text, shapes and crop.
+- **File combination** (`pdf.html`): merge PDFs and images into one PDF, arrange, rotate, duplicate and delete pages, or extract selected pages.
+- **Edit image** (`editor.html`): a layer-based image editor with selections, object removal, filters, painting, text, shapes and crop.
+- **File converter** (`converter.html`): convert, view, inspect and resize images, one at a time or in batches.
 
-Both run entirely in the browser: files never leave your device, there is no server, and they work offline.
+Everything runs in the browser, works offline, and has a light and a dark theme (dark by default; the switch is in every header).
+
+## Privacy
+
+- **Nothing is uploaded and nothing is downloaded from the internet.** Every library, icon and font the app uses ships inside this folder. There are no CDNs, web fonts, analytics, cookies or trackers.
+- **Enforced by the browser:** every page carries a Content Security Policy that blocks connections to any other address, so even a future mistake in the code couldn't send your files anywhere or pull content from the web.
+- **Stored on your device:** only the light/dark theme choice, in the browser's local storage. Files you open stay in memory and are gone when you close the tab.
+
+## File combination
+
+- Add PDFs and images (JPG, PNG, WebP, GIF, BMP). All pages appear as thumbnails, colour-coded by file.
+- **Arrange:** drag pages (several at once after Shift/Ctrl+click), or use Alt+←/→. Rotate (R), duplicate (Ctrl+D), delete (Del), reverse, reset.
+- **Preview** a page by double-clicking it.
+- **Download** everything as one PDF, or only the selected pages (also a quick way to split a PDF).
+- Pages are copied, not re-rendered, so text stays selectable and graphics stay sharp. Images can be placed on A4 or Letter pages, or at their own size.
+- `samples/` has three small PDFs to try it with (a 3-page report, a 2-page invoice with a landscape page, and a 4-page gallery with one page stored rotated).
 
 ## Editor
 
@@ -96,15 +112,22 @@ It works best on textures and backgrounds: sky, water, sand, grass, walls, roads
 
 No build step and no install. Either:
 
-- **Double-click `index.html`.** It works straight from disk, offline.
+- **Double-click `index.html`** for the home screen. It works straight from disk, offline.
 - **Serve the folder** with any static web server, e.g. `python3 -m http.server` and open <http://localhost:8000>.
 - **Publish it with GitHub Pages:** repository *Settings → Pages → Deploy from a branch*, pick the branch and `/ (root)`.
 
 ## Project layout
 
 ```
-index.html          Page layout
-css/styles.css      Styling (light and dark mode)
+index.html          Home screen
+converter.html      Converter page
+pdf.html            File combination page
+css/styles.css      Shared styling and light/dark themes
+css/pdf.css         File combination styling
+js/theme.js         Applies the saved theme before the page paints
+js/theme-toggle.js  Light/dark switch
+js/pdf/combine.js   File combination logic
+samples/            Sample PDFs
 editor.html         Editor page
 css/editor.css      Editor styling
 js/detect.js        Format detection from magic bytes, EXIF reader
@@ -117,8 +140,21 @@ js/editor/layers.js   Layer model, transforms, rendering
 js/editor/editor.js   Editor UI, tools, selections, history, export
 js/editor/toolbar.js  Tool groups and flyout menus
 js/editor/inpaint.js  Object removal (PatchMatch image completion)
-js/vendor/          UTIF.js (TIFF decoding) and pako (Deflate), both MIT-licensed
+js/vendor/          Third-party libraries (see below)
 ```
+
+## Third-party libraries
+
+All bundled in `js/vendor/` with their licence files. Every licence allows free use, including commercial use, as long as the licence notices are kept with the code.
+
+| Library | Used for | Licence |
+|---|---|---|
+| [pdf.js](https://github.com/mozilla/pdf.js) 3.11 (Mozilla) | Showing PDF pages | Apache 2.0 |
+| [pdf-lib](https://github.com/Hopding/pdf-lib) 1.17 | Building the combined PDF | MIT |
+| [UTIF.js](https://github.com/photopea/UTIF.js) 3.1 | Reading TIFF files | MIT |
+| [pako](https://github.com/nodeca/pako) 1.0 | Deflate decompression for TIFF | MIT |
+
+Everything else (encoders, editor, object removal, EPS reader) is original code in this repository.
 
 ## Limitations
 
