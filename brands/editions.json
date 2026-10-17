@@ -13,6 +13,18 @@
     "tagline": "Private file tools that run in your browser.",
     "themeKey": "studiolo-theme",
     "logo": "brands/studiolo/logo.svg",
-    "css": "brands/studiolo/brand.css"
+    "css": "brands/studiolo/brand.css",
+    "navLinks": [
+      {
+        "href": "about.html",
+        "label": "About",
+        "homeLabel": "About Studiolo \u2192"
+      }
+    ],
+    "extraFiles": {
+      "about.html": "brands/studiolo/about.html",
+      "css/about.css": "brands/studiolo/about.css",
+      "js/about.js": "brands/studiolo/about.js"
+    }
   }
 ]

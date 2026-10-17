@@ -20,6 +20,8 @@ The same app ships under two brands, listed in `brands/editions.json`:
 | Off the Clock Creative Suite | none yet | indigo / blue |
 | Studiolo | arched window (`brands/studiolo/logo.svg`) | amber / terracotta (`brands/studiolo/brand.css`) |
 
+Studiolo also has an **About** page (`brands/studiolo/about.html`, with `about.css` and `about.js`) crediting its creator, Daniel Velasquez. It's linked from every Studiolo page and the home screen. Pages and links that belong to one edition are listed under `extraFiles` and `navLinks` in `brands/editions.json`.
+
 The files in this folder are the Off the Clock Creative Suite edition. To build both editions as ready-to-share folders and ZIP files in `dist/`, run:
 
 ```

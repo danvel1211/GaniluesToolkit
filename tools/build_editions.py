@@ -41,6 +41,9 @@ def brand_text(text, ed, svg):
         text = text.replace('<!-- brand-logo-large -->', logo_markup(svg, 56, '<span class="logo" aria-hidden="true">%s</span>'))
         icon = svg.replace('fill="currentColor"', 'fill="#ea580c"')
         text = text.replace('<!-- brand-favicon -->', '<link rel="icon" href="data:image/svg+xml,%s">' % urllib.parse.quote(icon))
+    for link in ed.get('navLinks', []):
+        text = text.replace('<!-- brand-nav -->', '<a href="%s">%s</a>\n          <!-- brand-nav -->' % (link['href'], link['label']))
+        text = text.replace('<!-- brand-home-link -->', ' <a class="home-link" href="%s">%s</a><!-- brand-home-link -->' % (link['href'], link['homeLabel']))
     return text
 
 
@@ -66,6 +69,15 @@ def build(ed):
                     f.write(text)
             else:
                 shutil.copy2(src, dst)
+    # Pages and assets that only this edition has (e.g. Studiolo's About page).
+    for dst_rel, src_rel in ed.get('extraFiles', {}).items():
+        dst = os.path.join(out, dst_rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if dst_rel.endswith(TEXT_EXT):
+            with open(dst, 'w', encoding='utf-8') as f:
+                f.write(brand_text(read(src_rel), ed, svg))
+        else:
+            shutil.copy2(os.path.join(ROOT, src_rel), dst)
     archive = out + '.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
         for folder, _, files in os.walk(out):
