@@ -20,6 +20,24 @@ The same app ships under two brands, listed in `brands/editions.json`:
 | Off the Clock Creative Suite | none yet | indigo / blue |
 | Studiolo | arched window (`brands/studiolo/logo.svg`) | amber / terracotta (`brands/studiolo/brand.css`) |
 
+**Studiolo is packaged like installed software.** Its folder contains only:
+
+```
+Studiolo/
+├── Studiolo.exe    Windows launcher with the Studiolo icon
+├── Studiolo.html   launcher for Mac/Linux (redirects into the app)
+├── Read Me.txt
+└── resources/      the app itself
+```
+
+`Studiolo.exe` is a tiny program (source in `brands/studiolo/launcher/main.go`) that opens `resources/index.html` in the default browser. It carries the app icon (`brands/studiolo/Studiolo.ico`, designed in `app-icon.svg`) and version details (Studiolo 1.0.0, © 2026 Daniel Velasquez). It isn't code-signed, so Windows SmartScreen may warn the first time it's opened; signing it needs a code-signing certificate. To rebuild it after changing the icon or code (requires Go and [go-winres](https://github.com/tc-hib/go-winres)):
+
+```
+cd brands/studiolo/launcher
+go-winres simply --icon ../Studiolo.ico --manifest gui --product-name Studiolo --file-description Studiolo --product-version 1.0.0.0 --file-version 1.0.0.0 --copyright "© 2026 Daniel Velasquez" --original-filename Studiolo.exe --arch amd64
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-H windowsgui -s -w" -o ../Studiolo.exe .
+```
+
 Studiolo also has an **About** page (`brands/studiolo/about.html`, with `about.css` and `about.js`) crediting its creator, Daniel Velasquez. It's linked from every Studiolo page and the home screen. Pages and links that belong to one edition are listed under `extraFiles` and `navLinks` in `brands/editions.json`.
 
 The files in this folder are the Off the Clock Creative Suite edition. To build both editions as ready-to-share folders and ZIP files in `dist/`, run:

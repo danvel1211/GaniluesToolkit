@@ -1,0 +1,27 @@
+Studiolo 1.0
+Private file tools that run in your browser.
+Created by Daniel Velasquez · danvel1211@gmail.com
+
+HOW TO OPEN
+  Windows:        double-click Studiolo.exe
+  Mac or Linux:   double-click Studiolo.html
+
+Studiolo opens in your web browser. Nothing is installed, nothing is
+uploaded, and it works without an internet connection.
+
+Keep the "resources" folder next to Studiolo.exe and Studiolo.html.
+They need it to start.
+
+FIRST TIME ON WINDOWS
+Windows may show "Windows protected your PC" the first time, because
+Studiolo.exe is new and not yet signed with a publisher certificate.
+Click "More info", then "Run anyway". You can also open Studiolo.html
+instead; it starts exactly the same app.
+
+WHAT'S INSIDE
+  File combination   merge PDFs and images, arrange pages
+  Fill & sign PDF    fill forms and sign with a drawn, typed or uploaded signature
+  Edit image         layers, filters, selections and object removal
+  File converter     convert, inspect and resize images
+
+© 2026 Daniel Velasquez

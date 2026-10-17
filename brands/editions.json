@@ -18,13 +18,24 @@
       {
         "href": "about.html",
         "label": "About",
-        "homeLabel": "About Studiolo \u2192"
+        "homeLabel": "About Studiolo →"
       }
     ],
     "extraFiles": {
       "about.html": "brands/studiolo/about.html",
       "css/about.css": "brands/studiolo/about.css",
-      "js/about.js": "brands/studiolo/about.js"
+      "js/about.js": "brands/studiolo/about.js",
+      "icons/studiolo.png": "brands/studiolo/app-icon-512.png",
+      "icons/studiolo.ico": "brands/studiolo/Studiolo.ico"
+    },
+    "favicon": "icons/studiolo.png",
+    "package": {
+      "folder": "resources",
+      "rootFiles": {
+        "Studiolo.exe": "brands/studiolo/Studiolo.exe",
+        "Studiolo.html": "brands/studiolo/launcher.html",
+        "Read Me.txt": "brands/studiolo/Read Me.txt"
+      }
     }
   }
 ]
