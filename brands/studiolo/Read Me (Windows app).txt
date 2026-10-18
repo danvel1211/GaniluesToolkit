@@ -1,0 +1,31 @@
+Studiolo 1.0 — portable Windows app
+Private file tools that run on your device.
+Created by Daniel Velasquez · danvel1211@gmail.com
+
+HOW TO OPEN
+  Double-click Studiolo.exe. That's it — Studiolo opens in its own
+  window. There is nothing to install, nothing to set up, and no
+  admin rights are needed. You can run it straight from your Desktop,
+  a folder, or a USB stick, and move or copy the one file anywhere.
+
+  Windows may show "Windows protected your PC" the first time, because
+  Studiolo is a new program without a paid publisher certificate. Choose
+  "More info", then "Run anyway". This only checks who published the
+  file; it does not mean anything is wrong with it.
+
+  If your computer is managed by an employer or school, your IT
+  department may need to approve running new programs. That is a
+  setting on the computer, not something Studiolo needs installed.
+
+WHAT'S INSIDE
+  File combination   merge PDFs and images, arrange pages
+  Fill & sign PDF    fill forms and sign with a drawn, typed or uploaded signature
+  Edit image         layers, filters, selections and object removal
+  Collage maker       photo collages and grids for print or social media
+  File converter      convert, inspect and resize images
+
+Nothing you open in Studiolo is ever uploaded or sent anywhere. It
+works fully offline. Your name and licence code are remembered on this
+computer only.
+
+© 2026 Daniel Velasquez

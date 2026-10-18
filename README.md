@@ -21,17 +21,34 @@ The same app ships under two brands, listed in `brands/editions.json`:
 | Off the Clock Creative Suite | none yet | indigo / blue |
 | Studiolo | arched window (`brands/studiolo/logo.svg`) | amber / terracotta (`brands/studiolo/brand.css`) |
 
-**Studiolo is packaged like installed software.** Its folder contains only:
+**Studiolo ships two ways:**
+
+1. **Portable Windows app** (`dist/Studiolo-portable.zip`, from `tools/build_exe.py`): a single `Studiolo.exe`. Double-click it and it opens in its own window — no installer, no setup wizard, no admin rights, nothing written outside a small per-user settings folder. It can run from the Desktop, any folder, or a USB stick, and copying or moving the file is all "installing" it ever needs. This is the one to use on a work laptop that locks down installers — there's nothing to install.
+2. **HTML package** (`dist/studiolo.zip`, from `tools/build_editions.py`), for Mac/Linux or anyone who'd rather keep the readable web files. Its folder contains only:
+
+   ```
+   Studiolo/
+   ├── Studiolo.html                 opens the app in the browser
+   ├── Add Studiolo to Desktop.cmd   optional Windows setup for the icon
+   ├── Read Me.txt
+   └── resources/                    the app itself
+   ```
+
+   An `.html` file always shows the default browser's icon on Windows, so the Studiolo icon (`brands/studiolo/Studiolo.ico`, designed in `app-icon.svg`) is applied by `Add Studiolo to Desktop.cmd`. Run once, it creates Desktop and Start-menu shortcuts to `Studiolo.html` with the icon and gives the folder the icon via a hidden `desktop.ini`. It's a plain-text script that installs and downloads nothing. Inside the app, the icon is also the browser-tab icon.
+
+### The portable app (`brands/studiolo/app/`)
+
+A small Go program (`main.go`) that serves the whole web app from memory on `127.0.0.1` (never reachable from outside the machine) and shows it in a plain window, using the WebView2 engine already built into Windows 10/11 — no browser chrome, no address bar, and the right-click "Inspect"/F12 developer tools are turned off.
+
+Unlike the HTML package, **none of the app's HTML, CSS or JavaScript is readable inside the `.exe`.** `tools/build_exe.py` packs the built web app into one ZIP, encrypts it with AES-256-GCM, and embeds only that encrypted blob (`app.bin`) plus a split, masked key (`keydata.go`) — both generated, not committed. The running app decrypts it in memory only; no plain files ever touch disk. `winres/` holds the icon and version info embedded in the executable.
 
 ```
-Studiolo/
-├── Studiolo.html                 opens the app
-├── Add Studiolo to Desktop.cmd   optional Windows setup for the icon
-├── Read Me.txt
-└── resources/                    the app itself
+python3 tools/build_exe.py
 ```
 
-An `.html` file always shows the default browser's icon on Windows, so the Studiolo icon (`brands/studiolo/Studiolo.ico`, designed in `app-icon.svg`) is applied by `Add Studiolo to Desktop.cmd`. Run once, it creates Desktop and Start-menu shortcuts to `Studiolo.html` with the icon and gives the folder the icon via a hidden `desktop.ini`. It's a plain-text script that installs and downloads nothing. Inside the app, the icon is also the browser-tab icon.
+runs the whole pipeline (build the Studiolo edition → pack & encrypt it → cross-compile `Studiolo.exe` for Windows → zip it) from any machine with Go 1.22+, no Windows box or C compiler needed. Like scrambled JavaScript, this raises the bar a lot — it stops casual copying and "paste it into an AI" — but it isn't unbreakable; a determined reverse engineer with native-code tools could still get at it. The licence codes stay safe either way, since even full access to the code can't recover them from their one-way fingerprints.
+
+The first run may show Windows' "protected your PC" notice, because the app isn't signed with a paid publisher certificate; choosing "More info → Run anyway" is a one-time step, not an install.
 
 ### Studiolo licensing
 
