@@ -3,7 +3,8 @@
  *
  * Runs as YOU inside your Google account. The Studiolo app sends it a licence code and a
  * name; it looks the code up in your private Google Sheet and answers with just
- * ok / used / invalid. The sheet itself is never shared, and its ID is kept in Script
+ * ok / used / invalid. A code works once: the first name to activate it is written into the sheet,
+ * and after that the code is refused for everyone. The sheet itself is never shared, and its ID is kept in Script
  * Properties, not in this code or in the app.
  *
  * Sheet layout (first sheet, row 1 = headings):
@@ -50,13 +51,13 @@ function claim_(code, name) {
   var rows = sheet.getRange(2, 1, last - 1, 2).getValues();
   for (var i = 0; i < rows.length; i++) {
     if (norm_(rows[i][0]) !== raw) continue;
-    var owner = String(rows[i][1] || '').replace(/\s+/g, ' ').trim();
+    var owner = String(rows[i][1] || '').trim();
     if (!owner) {
       sheet.getRange(i + 2, 2, 1, 2).setValues([[name, new Date()]]);
       return { status: 'ok' };
     }
-    // The same person can activate again (new computer, cleared browser data); anyone else cannot.
-    return { status: owner.toLowerCase() === name.toLowerCase() ? 'ok' : 'used' };
+    // Name cell empty = first use (registered above). Any name already there, even the same one, means used.
+    return { status: 'used' };
   }
   return { status: 'invalid' };
 }

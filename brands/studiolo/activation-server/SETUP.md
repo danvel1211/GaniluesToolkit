@@ -1,6 +1,6 @@
 # Setting up code activation (one time, about 10 minutes)
 
-This makes a licence code usable by **one person only**. The first name that activates a code owns it. The same name can activate again (new computer), but a different name is refused.
+This makes a licence code usable **once**. When someone activates a code and its **Name** cell is empty, their name is written there. If the Name cell already has any name (even the same one), the app says the code is already used.
 
 Your Google Sheet stays **private**. The app never contains the sheet's link; it only talks to a small script that answers "ok / used / invalid".
 
@@ -31,5 +31,5 @@ Then rebuild: `python3 tools/build_exe.py`.
 ## Notes
 - Activation needs the internet **once**. After that the licence is remembered and Studiolo works offline.
 - The developer code never contacts the server.
-- To free a code (customer changes name or gets a new person): clear that row's **Name** and **Activated** cells.
+- A customer who reinstalls, switches computers or clears the app's saved data will be told the code is used. To let them in again, clear that row's **Name** and **Activated** cells; they can then activate once more.
 - If you change the script, use **Deploy → Manage deployments → Edit → New version** so the address stays the same.
