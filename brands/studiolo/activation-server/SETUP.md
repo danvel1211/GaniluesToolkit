@@ -6,7 +6,7 @@ Your Google Sheet stays **private**. The app never contains the sheet's link; it
 
 ## 1. Make the codes sheet
 1. In Google Drive, open **Studiolo licence codes - batch B1.xlsx** and choose **Open with → Google Sheets**, then **File → Save as Google Sheets**.
-2. Row 1 must be headings. Column **A = Code**, **B = Name**, **C = Activated**. Leave B and C empty; the script fills them in.
+2. Row 1 must be headings, with the codes under a heading called **Licence code**. The script adds two columns, **Activated by** and **Activated on**, and fills them in. Your other columns (such as *Given to*) are never touched.
 3. Keep this sheet private (don't share it, and don't put it in a folder shared by link).
 
 ## 2. Add the script
@@ -31,5 +31,5 @@ Then rebuild: `python3 tools/build_exe.py`.
 ## Notes
 - Activation needs the internet **once**. After that the licence is remembered and Studiolo works offline.
 - The developer code never contacts the server.
-- A customer who reinstalls, switches computers or clears the app's saved data will be told the code is used. To let them in again, clear that row's **Name** and **Activated** cells; they can then activate once more.
+- A customer who reinstalls, switches computers or clears the app's saved data will be told the code is used. To let them in again, clear that row's **Activated by** and **Activated on** cells; they can then activate once more.
 - If you change the script, use **Deploy → Manage deployments → Edit → New version** so the address stays the same.

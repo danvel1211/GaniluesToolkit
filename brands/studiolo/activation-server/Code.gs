@@ -7,13 +7,17 @@
  * and after that the code is refused for everyone. The sheet itself is never shared, and its ID is kept in Script
  * Properties, not in this code or in the app.
  *
- * Sheet layout (first sheet, row 1 = headings):
- *   A: Code      B: Name (filled in by this script)      C: Activated (date, filled in by this script)
+ * Sheet layout (first sheet, row 1 = headings): a column headed "Licence code" holds the codes. This
+ * script adds and fills two more columns, "Activated by" and "Activated on". Other columns (such as
+ * "Given to") are left alone.
  *
  * Setup: see activation-server/SETUP.md
  */
 
 var SHEET_PROP = 'SHEET_ID';
+var CODE_HEADING = 'Licence code';   // the column that holds the codes
+var NAME_HEADING = 'Activated by';   // filled in by this script (created if missing)
+var DATE_HEADING = 'Activated on';   // filled in by this script (created if missing)
 
 function doPost(e) {
   var out = { status: 'error' };
@@ -39,6 +43,17 @@ function norm_(s) {
   return String(s).toUpperCase().replace(/[\s-]/g, '');
 }
 
+// Finds a column by its heading in row 1 (1-based), or adds the heading at the end.
+function column_(sheet, headings, heading, create) {
+  var i = headings.indexOf(heading);
+  if (i >= 0) return i + 1;
+  if (!create) return 0;
+  var col = headings.length + 1;
+  sheet.getRange(1, col).setValue(heading);
+  headings.push(heading);
+  return col;
+}
+
 function claim_(code, name) {
   var raw = norm_(code);
   name = name.replace(/\s+/g, ' ').trim();
@@ -47,17 +62,22 @@ function claim_(code, name) {
   var id = PropertiesService.getScriptProperties().getProperty(SHEET_PROP);
   var sheet = SpreadsheetApp.openById(id).getSheets()[0];
   var last = sheet.getLastRow();
-  if (last < 2) return { status: 'invalid' };
-  var rows = sheet.getRange(2, 1, last - 1, 2).getValues();
-  for (var i = 0; i < rows.length; i++) {
-    if (norm_(rows[i][0]) !== raw) continue;
-    var owner = String(rows[i][1] || '').trim();
-    if (!owner) {
-      sheet.getRange(i + 2, 2, 1, 2).setValues([[name, new Date()]]);
-      return { status: 'ok' };
-    }
-    // Name cell empty = first use (registered above). Any name already there, even the same one, means used.
-    return { status: 'used' };
+  var width = sheet.getLastColumn();
+  if (last < 2 || width < 1) return { status: 'invalid' };
+  var headings = sheet.getRange(1, 1, 1, width).getValues()[0].map(function (h) { return String(h).trim(); });
+  var codeCol = column_(sheet, headings, CODE_HEADING, false);
+  if (!codeCol) return { status: 'error' };
+
+  var codes = sheet.getRange(2, codeCol, last - 1, 1).getValues();
+  for (var i = 0; i < codes.length; i++) {
+    if (norm_(codes[i][0]) !== raw) continue;
+    var nameCol = column_(sheet, headings, NAME_HEADING, true);
+    var dateCol = column_(sheet, headings, DATE_HEADING, true);
+    var owner = String(sheet.getRange(i + 2, nameCol).getValue() || '').trim();
+    if (owner) return { status: 'used' };   // any name already there, even the same one, means used
+    sheet.getRange(i + 2, nameCol).setValue(name);
+    sheet.getRange(i + 2, dateCol).setValue(new Date());
+    return { status: 'ok' };
   }
   return { status: 'invalid' };
 }
