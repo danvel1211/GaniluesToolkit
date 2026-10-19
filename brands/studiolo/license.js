@@ -83,7 +83,7 @@
   }
 
   // Asks the activation server something about this code and name.
-  // action 'claim' (first activation) calls back 'ok', 'used', 'invalid' or 'offline';
+  // action 'claim' (first activation) calls back 'ok', 'used', 'invalid', 'fault' or 'offline';
   // action 'check' (every launch) calls back 'valid', 'revoked' or 'offline'.
   function ask(action, code, name, done) {
     var allowed = action === 'check' ? ['valid', 'revoked'] : ['ok', 'used', 'invalid'];
@@ -96,7 +96,8 @@
         body: JSON.stringify({ a: action, c: code, n: name })
       }).then(function (res) { return res.json(); }).then(function (j) {
         clearTimeout(timer);
-        end(j && allowed.indexOf(j.status) >= 0 ? j.status : 'offline');
+        // 'fault' = the service answered but reported a problem (e.g. it can't open the sheet).
+        end(j && allowed.indexOf(j.status) >= 0 ? j.status : j && j.status === 'error' ? 'fault' : 'offline');
       }).catch(function () { clearTimeout(timer); end('offline'); });
     } catch (e) { clearTimeout(timer); end('offline'); }
   }
@@ -233,7 +234,9 @@
             ? 'This code is already registered to someone else. Contact ' + CONTACT + ' if that\'s a mistake.'
             : status === 'invalid'
               ? 'That licence code isn\'t recognised. Check for typos, or contact ' + CONTACT + '.'
-              : 'Couldn\'t reach the activation service. Connect to the internet once to activate; after that Studiolo works offline.';
+              : status === 'fault'
+                ? 'The activation service is reachable but reported a problem. Please contact ' + CONTACT + ' (the licence list may need attention).'
+                : 'Couldn\'t reach the activation service. Connect to the internet once to activate; after that Studiolo works offline.';
           return;
         }
         save(r.code, name, name, Date.now());
