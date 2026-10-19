@@ -18,12 +18,18 @@ var SHEET_PROP = 'SHEET_ID';
 var CODE_HEADING = 'Licence code';   // the column that holds the codes
 var NAME_HEADING = 'Activated by';   // filled in by this script (created if missing)
 var DATE_HEADING = 'Activated on';   // filled in by this script (created if missing)
+var CHUNK = 1500000;                 // bytes of the update file sent per request
 
 function doPost(e) {
   var out = { status: 'error' };
   try {
     var body = JSON.parse(e.postData.contents);
-    if (body.a === 'check') {
+    if (body.a === 'update' || body.a === 'chunk') {
+      // App updates: only for a licence that is still active. The file stays private in your Drive.
+      var who = checkCached_(String(body.c || ''), String(body.n || ''));
+      out = who.status !== 'valid' ? { status: 'denied' }
+        : body.a === 'update' ? updateInfo_() : updateChunk_(parseInt(body.i, 10));
+    } else if (body.a === 'check') {
       // Read-only and very frequent (every app launch): no queue, and "valid" answers are cached for a few minutes.
       out = checkCached_(String(body.c || ''), String(body.n || ''));
     } else {
@@ -122,6 +128,50 @@ function check_(code, name) {
     return { status: owner && owner.toLowerCase() === name.toLowerCase() ? 'valid' : 'revoked' };
   }
   return { status: 'revoked' };
+}
+
+// What the app is told about the newest version (set with setUpdate below).
+function updateInfo_() {
+  var p = PropertiesService.getScriptProperties();
+  var version = p.getProperty('UPDATE_VERSION'), id = p.getProperty('UPDATE_FILE_ID');
+  if (!version || !id) return { status: 'none' };
+  var size = parseInt(p.getProperty('UPDATE_SIZE'), 10);
+  return {
+    status: 'ok', version: version, notes: p.getProperty('UPDATE_NOTES') || '',
+    sha256: p.getProperty('UPDATE_SHA256'), size: size, chunks: Math.ceil(size / CHUNK)
+  };
+}
+
+// One slice of the update file, base64-encoded, read straight from your private Drive file.
+function updateChunk_(i) {
+  var p = PropertiesService.getScriptProperties();
+  var id = p.getProperty('UPDATE_FILE_ID'), size = parseInt(p.getProperty('UPDATE_SIZE'), 10);
+  if (!id || isNaN(i) || i < 0 || i * CHUNK >= size) return { status: 'error' };
+  var bytes = DriveApp.getFileById(id).getBlob().getBytes();
+  return { status: 'ok', data: Utilities.base64Encode(bytes.slice(i * CHUNK, Math.min(size, (i + 1) * CHUNK))) };
+}
+
+/**
+ * Publishing an update (run from the editor, once per new version):
+ *   1. Upload the new Studiolo.exe to your Drive (keep it private).
+ *   2. Put its file ID, the new version number and a short note below, then Run this function.
+ * The ID is the long part of the file's link between /d/ and /view.
+ */
+function setUpdate() {
+  var fileId = 'PASTE-THE-EXE-FILE-ID-HERE';
+  var version = '1.1.0';
+  var notes = 'What is new in this version.';
+
+  var bytes = DriveApp.getFileById(fileId).getBlob().getBytes();
+  if (bytes.length < 1000000 || bytes[0] !== 77 || bytes[1] !== 90) throw new Error('That file does not look like Studiolo.exe');
+  var hex = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes).map(function (b) {
+    return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2);
+  }).join('');
+  PropertiesService.getScriptProperties().setProperties({
+    UPDATE_FILE_ID: fileId, UPDATE_VERSION: version, UPDATE_NOTES: notes,
+    UPDATE_SHA256: hex, UPDATE_SIZE: String(bytes.length)
+  });
+  Logger.log('Update ' + version + ' published: ' + bytes.length + ' bytes, sha256 ' + hex);
 }
 
 /**

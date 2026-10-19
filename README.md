@@ -50,6 +50,15 @@ runs the whole pipeline (build the Studiolo edition → pack & encrypt it → cr
 
 The first run may show Windows' "protected your PC" notice, because the app isn't signed with a paid publisher certificate; choosing "More info → Run anyway" is a one-time step, not an install.
 
+### In-app updater (paused: backend done, button not built yet)
+
+Groundwork for a "Check for updates" button in the portable app. **Nothing is switched on in the shipped app yet.**
+
+- `brands/studiolo/app/update.go` (tested with `go test` in `brands/studiolo/app/`): asks the licence script for the newest version, downloads `Studiolo.exe` in pieces, checks its size and SHA-256 fingerprint, then swaps it in by renaming the running program to `Studiolo.old.exe`, putting the new one in its place and restarting. It clears the window engine's *cache* but keeps the saved licence, because deleting that would lock customers out (each code works once).
+- `brands/studiolo/app/main.go` already contains the bridge functions the page will call (`__sxu_*`) and the start-up cleanup.
+- `brands/studiolo/activation-server/Code.gs` has the matching `update` and `chunk` actions and a `setUpdate()` function that publishes a new version from a private Drive file. The script already deployed in Google does **not** have these yet.
+- Still to do: the side "Updates" button and panel in the page (progress, notes, restart), a `version.txt` read by `tools/build_exe.py`, and a trial on a real Windows PC. The first updater-enabled build must be handed out by hand; later versions can update themselves.
+
 ### Studiolo licensing
 
 Studiolo is locked until the user enters **their name and a licence code** (like `7KQ2-M9XA-P4TD-WZ3R`). The name personalises the app ("Good evening, Maria", "Licensed to Maria Santos"); the code unlocks it. Off the Clock Creative Suite has no licensing.

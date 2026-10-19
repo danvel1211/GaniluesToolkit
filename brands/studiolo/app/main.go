@@ -1,3 +1,5 @@
+//go:build windows
+
 // Studiolo portable app.
 //
 // This is a thin native wrapper around the Studiolo web app. The whole web app
@@ -25,9 +27,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/jchv/go-webview2"
@@ -39,6 +43,9 @@ import (
 //
 //go:embed app.bin
 var packed []byte
+
+// version is set at build time (tools/build_exe.py reads brands/studiolo/version.txt).
+var version = "0.0.0"
 
 // openApp decrypts and unpacks the embedded web app into an in-memory file system.
 func openApp() (fs.FS, error) {
@@ -81,20 +88,39 @@ func main() {
 		panic(err)
 	}
 
+	exe, _ := os.Executable()
+	// Started by an update? Then the previous copy is still shutting down: wait for it, and tidy up after it.
+	updated := len(os.Args) > 1 && os.Args[1] == "--updated"
+
 	// Loopback only. Serving over http keeps relative paths, blob workers and the
 	// CSP behaving exactly as they do on disk, but the "site" exists only in this
 	// process's memory. The port is fixed (with a few fallbacks) because the saved
 	// licence lives in the page's storage, which is tied to the address.
 	var ln net.Listener
-	for port := 47615; port < 47625 && ln == nil; port++ {
-		if l, e := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port)); e == nil {
-			ln = l
+	for tries := 0; ln == nil && tries < 40; tries++ {
+		for port := 47615; port < 47625 && ln == nil; port++ {
+			if l, e := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port)); e == nil {
+				ln = l
+			}
+			if updated && ln == nil && port == 47615 {
+				break // after an update only the usual port will do: wait for the old copy to let go of it
+			}
+		}
+		if ln == nil && updated {
+			time.Sleep(500 * time.Millisecond)
+		} else if ln == nil {
+			break
 		}
 	}
 	if ln == nil {
 		panic("no free local port")
 	}
-	go http.Serve(ln, http.FileServer(http.FS(sub)))
+	// Always revalidate, so a new version's pages are never mixed with cached old ones.
+	files := http.FileServer(http.FS(sub))
+	go http.Serve(ln, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Cache-Control", "no-cache")
+		files.ServeHTTP(rw, r)
+	}))
 	url := "http://" + ln.Addr().String() + "/index.html"
 
 	// The window engine keeps the app's saved settings (name and licence) in a small
@@ -103,6 +129,11 @@ func main() {
 	if base, e := os.UserCacheDir(); e == nil {
 		data = filepath.Join(base, "Studiolo")
 	}
+
+	if updated {
+		clearWebCache(data)
+	}
+	go cleanupOld(exe)
 
 	w := webview2.NewWithOptions(webview2.WebViewOptions{
 		Debug:     false, // no developer tools in the shipped app
@@ -120,6 +151,26 @@ func main() {
 		panic("webview2 unavailable")
 	}
 	defer w.Destroy()
+
+	// The page's "Updates" button talks to the updater through these. Each call returns at once;
+	// the page asks for progress with __sxu_state.
+	up := newUpdater(exe, version, updated)
+	w.Bind("__sxu_version", func() string { return version })
+	w.Bind("__sxu_check", func(addr, code, name string) string { up.StartCheck(addr, code, name); return "started" })
+	w.Bind("__sxu_download", func(addr, code, name string) string { up.StartDownload(addr, code, name); return "started" })
+	w.Bind("__sxu_state", func() string { return up.StateJSON() })
+	w.Bind("__sxu_install", func() string {
+		if err := up.Install(); err != nil {
+			return err.Error()
+		}
+		// Start the new program, then close this one so the new one can take over.
+		if err := exec.Command(exe, "--updated").Start(); err != nil {
+			return "The update is installed, but Studiolo couldn't restart itself. Please open it again."
+		}
+		w.Dispatch(func() { w.Terminate() })
+		return ""
+	})
+
 	w.Navigate(url)
 	w.Run()
 }
