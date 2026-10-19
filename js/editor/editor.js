@@ -26,7 +26,7 @@
     panY: 0,
     color: '#e11d48',
     secondary: '#ffffff',
-    brush: { size: 24, opacity: 1, soft: 0 },
+    brush: { size: 24, opacity: 1, soft: 0, preset: 'hard' },
     sprayDensity: 40,
     tolerance: 32,
     contiguous: true,
@@ -731,6 +731,9 @@
       erase: erase,
       last: null
     };
+    // Brush and Eraser follow the chosen brush style; Pencil and Spray keep their own look.
+    op.style = tool === 'brush' || tool === 'eraser' ? Brushes.preset(state.brush.preset).style : 'round';
+    if (op.style !== 'round') op.params = Brushes.newParams(op.style, op.width);
     state.op = op;
     paintTo(p);
     if (tool === 'spray') {
@@ -749,6 +752,7 @@
     var from = op.last || q;
     if (op.tool === 'pencil') pencilLine(op, from, q);
     else if (op.tool === 'spray') sprayAt(op, q);
+    else if (op.style !== 'round') Brushes.stamp(op.stroke.getContext('2d'), op.params, op.erase ? '#000000' : state.color, from, q);
     else brushLine(op, from, q);
     op.last = q;
     composeStroke(op);
@@ -1937,6 +1941,36 @@
     $('l-del').onclick = function () { deleteLayer(selected()); };
   }
 
+  function syncBrushStyle() {
+    $('brush-style').value = state.brush.preset;
+    // Softness only shapes the round brushes; the other styles have their own texture.
+    $('brush-soft').closest('label').hidden = Brushes.preset(state.brush.preset).style !== 'round';
+  }
+
+  function chooseBrushStyle(pr) {
+    state.brush.preset = pr.id;
+    if (pr.soft !== undefined) {
+      state.brush.soft = pr.soft;
+      $('brush-soft').value = pr.soft;
+    }
+    syncBrushStyle();
+  }
+
+  // Right-click on the canvas with the Brush or Eraser opens the style menu next to the cursor.
+  function openBrushMenu(e) {
+    Brushes.openMenu({
+      x: e.clientX + 6, y: e.clientY + 6,
+      erase: state.tool === 'eraser',
+      color: state.color,
+      current: state.brush.preset,
+      size: state.brush.size,
+      opacity: state.brush.opacity,
+      onPick: chooseBrushStyle,
+      onSize: function (n) { $('brush-size').value = n; $('brush-size').oninput(); },
+      onOpacity: function (n) { $('brush-opacity').value = n; $('brush-opacity').oninput(); }
+    });
+  }
+
   function bindOptions() {
     $('brush-size').oninput = function () {
       state.brush.size = +this.value;
@@ -1946,7 +1980,23 @@
       state.brush.opacity = +this.value / 100;
       $('brush-opacity-out').textContent = this.value + '%';
     };
-    $('brush-soft').oninput = function () { state.brush.soft = +this.value; };
+    $('brush-soft').oninput = function () {
+      state.brush.soft = +this.value;
+      // Moving Softness on a round brush switches between the Hard and Soft round presets.
+      if (Brushes.preset(state.brush.preset).style === 'round') {
+        state.brush.preset = state.brush.soft > 0 ? 'soft' : 'hard';
+        syncBrushStyle();
+      }
+    };
+    var styleSelect = $('brush-style');
+    Brushes.PRESETS.forEach(function (pr) {
+      var o = document.createElement('option');
+      o.value = pr.id;
+      o.textContent = pr.name;
+      styleSelect.appendChild(o);
+    });
+    styleSelect.onchange = function () { chooseBrushStyle(Brushes.preset(this.value)); };
+    syncBrushStyle();
     $('spray-density').oninput = function () { state.sprayDensity = +this.value; };
     $('fill-tolerance').oninput = function () {
       state.tolerance = +this.value;
@@ -2049,7 +2099,10 @@
       if (e.relatedTarget && $('side').contains(e.relatedTarget)) return;
       finishTextEdit();
     });
-    view.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    view.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      if (state.doc && !state.op && (state.tool === 'brush' || state.tool === 'eraser')) openBrushMenu(e);
+    });
     wrap.addEventListener('wheel', function (e) {
       if (!state.doc) return;
       e.preventDefault();

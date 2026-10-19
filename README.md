@@ -6,7 +6,7 @@ Off the Clock Creative Suite is a set of standalone web tools for working with f
 
 - **File combination** (`pdf.html`): merge PDFs and images into one PDF, arrange, rotate, duplicate and delete pages, or extract selected pages.
 - **Fill & sign PDF** (`sign.html`): fill in PDF forms, detect blank fields in ordinary PDFs, add text, dates, ticks and white-out, and sign with a drawn, typed or uploaded signature.
-- **Edit image** (`editor.html`): a layer-based image editor with selections, object removal, filters, painting, text, shapes and crop.
+- **Edit image** (`editor.html`): a layer-based image editor with selections, object removal, filters, painting (right-click the canvas with the Brush or Eraser for seven brush styles with live previews: hard and soft round, airbrush, square marker, calligraphy, chalk and dry bristle), text, shapes and crop.
 - **Collage maker** (`collage.html`): photo collages and grids with 16 layouts, adjustable spacing, borders and rounded corners, drag to swap or reposition photos, and export for social media or print (PNG, JPEG, WebP, PDF).
 - **File converter** (`converter.html`): convert, view, inspect and resize images, one at a time or in batches.
 
@@ -221,6 +221,7 @@ js/encoders.js      Output encoders (BMP, TIFF, ICO, GIF, EPS, PDF and SVG are w
 js/app.js           Converter UI, preview, resize/rotate pipeline, conversion
 js/editor/filters.js  Adjustments engine (colour matrix, blur, sharpen, vignette)
 js/editor/layers.js   Layer model, transforms, rendering
+js/editor/brushes.js  Brush styles and the right-click brush menu
 js/editor/editor.js   Editor UI, tools, selections, history, export
 js/editor/toolbar.js  Tool groups and flyout menus
 js/editor/inpaint.js  Object removal (PatchMatch image completion)
