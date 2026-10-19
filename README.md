@@ -6,7 +6,7 @@ Off the Clock Creative Suite is a set of standalone web tools for working with f
 
 - **File combination** (`pdf.html`): merge PDFs and images into one PDF, arrange, rotate, duplicate and delete pages, or extract selected pages.
 - **Fill & sign PDF** (`sign.html`): fill in PDF forms, detect blank fields in ordinary PDFs, add text, dates, ticks and white-out, and sign with a drawn, typed or uploaded signature.
-- **Edit image** (`editor.html`): a layer-based image editor with selections, object removal, filters, painting (right-click the canvas with the Brush or Eraser for seven brush styles with live previews: hard and soft round, airbrush, square marker, calligraphy, chalk and dry bristle), text, shapes and crop.
+- **Edit image** (`editor.html`): a layer-based image editor with selections, object removal, filters, painting (right-click the canvas with the Brush or Eraser for seven brush styles with live previews), retouch tools (clone stamp, blur, sharpen, smudge, dodge, burn), blur or pixelate a selection to hide faces and plates, drop shadow and outline for any layer, one-click auto enhance, layer alignment, text, shapes and crop with ratio presets (1:1, 4:5, 16:9, 9:16 and more).
 - **Collage maker** (`collage.html`): photo collages and grids with 16 layouts, adjustable spacing, borders and rounded corners, drag to swap or reposition photos, and export for social media or print (PNG, JPEG, WebP, PDF).
 - **File converter** (`converter.html`): convert, view, inspect and resize images, one at a time or in batches.
 

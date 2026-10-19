@@ -415,3 +415,11 @@
 .brush-slider { display: block; padding: 6px 9px 0; font-size: 12px; color: var(--muted); }
 .brush-slider input { display: block; width: 100%; margin-top: 3px; }
 .brush-slider output { color: var(--text); font-weight: 600; }
+
+.sel-strength { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.sel-strength input { width: 90px; }
+
+/* Layer effects */
+.fx-block { margin: 12px 0 4px; padding-top: 10px; border-top: 1px solid var(--border); }
+.fx-head { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; }
+.fx-body { margin: 2px 0 10px 4px; padding: 8px 10px; border-left: 2px solid var(--accent-soft); }

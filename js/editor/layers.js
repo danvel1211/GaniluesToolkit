@@ -87,6 +87,76 @@
     return l;
   }
 
+  /* ---- layer effects: drop shadow and outline ---- */
+
+  function fxDefault() {
+    return {
+      shadow: { on: false, color: '#000000', opacity: 0.5, blur: 10, dx: 6, dy: 6 },
+      outline: { on: false, color: '#ffffff', width: 4 }
+    };
+  }
+
+  // A full effects object (filling in anything missing); safe to modify.
+  function fxCopy(fx) {
+    var d = fxDefault();
+    if (fx) {
+      for (var g in d) for (var k in d[g]) if (fx[g] && fx[g][k] !== undefined) d[g][k] = fx[g][k];
+    }
+    return d;
+  }
+
+  function fxActive(l) {
+    return !!(l.fx && (l.fx.shadow.on || (l.fx.outline.on && l.fx.outline.width > 0)));
+  }
+
+  function tinted(src, color, padLeft, w, h) {
+    var c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(src, padLeft, padLeft);
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, w, h);
+    return c;
+  }
+
+  // Builds (and caches) the outlined picture and the blurred shadow for a layer's current look.
+  function fxBuild(l, img) {
+    var key = JSON.stringify(l.fx);
+    if (l._fx && l._fxSrc === img && l._fxKey === key) return l._fx;
+    var o = l.fx.outline, sh = l.fx.shadow;
+    var ow = o.on ? Math.max(0, o.width) : 0, pad = Math.ceil(ow) + 2;
+    var w = img.width + pad * 2, h = img.height + pad * 2;
+    var outlined = document.createElement('canvas');
+    outlined.width = w;
+    outlined.height = h;
+    var octx = outlined.getContext('2d');
+    if (ow > 0) {
+      var tint = tinted(img, o.color, pad, w, h);
+      var rings = ow > 6 ? [ow, ow / 2] : [ow];
+      rings.forEach(function (r) {
+        var steps = Math.max(16, Math.min(72, Math.ceil(r * Math.PI * 2)));
+        for (var i = 0; i < steps; i++) {
+          var a = (i / steps) * Math.PI * 2;
+          octx.drawImage(tint, Math.cos(a) * r, Math.sin(a) * r);
+        }
+      });
+    }
+    octx.drawImage(img, pad, pad);
+    var built = { outlined: outlined, pad: pad, shadow: null, spad: 0 };
+    if (sh.on) {
+      var spad = Math.ceil(sh.blur * 2) + 2, sw = w + spad * 2, shh = h + spad * 2;
+      var sil = tinted(outlined, sh.color, spad, sw, shh);
+      built.shadow = sh.blur > 0 ? Filters.apply(sil, (function () { var f = Filters.defaults(); f.blur = Math.min(50, sh.blur); return f; })()) : sil;
+      built.spad = spad;
+    }
+    l._fx = built;
+    l._fxSrc = img;
+    l._fxKey = key;
+    return built;
+  }
+
   // Shallow copy for history snapshots. Render caches are shared: they are keyed on content,
   // so a later edit to either copy simply misses the cache.
   function clone(l) {
@@ -94,6 +164,7 @@
     for (var k in l) c[k] = l[k];
     c.filters = {};
     for (var f in l.filters) c.filters[f] = l.filters[f];
+    if (l.fx) c.fx = fxCopy(l.fx);
     return c;
   }
 
@@ -308,7 +379,21 @@
     ctx.globalCompositeOperation = l.blend;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(rendered(l), 0, 0);
+    var img = rendered(l);
+    if (fxActive(l)) {
+      var fx = fxBuild(l, img);
+      if (fx.shadow) {
+        // The shadow keeps pointing the same way on screen however the layer is rotated or scaled.
+        var r = (-l.rotation * Math.PI) / 180, dx = l.fx.shadow.dx, dy = l.fx.shadow.dy;
+        var lx = (dx * Math.cos(r) - dy * Math.sin(r)) / (l.scaleX || 1), ly = (dx * Math.sin(r) + dy * Math.cos(r)) / (l.scaleY || 1);
+        ctx.globalAlpha = l.opacity * l.fx.shadow.opacity;
+        ctx.drawImage(fx.shadow, -fx.pad - fx.spad + lx, -fx.pad - fx.spad + ly);
+        ctx.globalAlpha = l.opacity;
+      }
+      ctx.drawImage(fx.outlined, -fx.pad, -fx.pad);
+    } else {
+      ctx.drawImage(img, 0, 0);
+    }
     ctx.restore();
   }
 
@@ -348,6 +433,9 @@
     createText: createText,
     createShape: createShape,
     clone: clone,
+    fxDefault: fxDefault,
+    fxCopy: fxCopy,
+    fxActive: fxActive,
     duplicate: duplicate,
     content: content,
     rendered: rendered,

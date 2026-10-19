@@ -28,6 +28,10 @@
     secondary: '#ffffff',
     brush: { size: 24, opacity: 1, soft: 0, preset: 'hard' },
     sprayDensity: 40,
+    retouchSoft: 50,
+    cropRatio: 0, // 0 = free, otherwise width / height
+    cloneSrc: null, // clone stamp source point (document pixels)
+    cloneOffset: null,
     tolerance: 32,
     contiguous: true,
     gradientType: 'linear',
@@ -273,6 +277,14 @@
       vctx.strokeStyle = 'rgba(255,255,255,0.9)';
       vctx.beginPath(); vctx.arc(c.x, c.y, rad + 1, 0, Math.PI * 2); vctx.stroke();
     }
+    if (state.tool === 'clone' && state.cloneSrc) {
+      // Where the clone is copying from: the fixed source, or following the brush once painting started.
+      var sp = state.cloneOffset && state.hover ? { x: state.hover.x + state.cloneOffset.x, y: state.hover.y + state.cloneOffset.y } : state.cloneSrc;
+      var sc = toScreen(sp), sr = Math.max(6, (state.brush.size / 2) * state.zoom);
+      vctx.lineWidth = 1.5;
+      vctx.strokeStyle = accent;
+      vctx.beginPath(); vctx.arc(sc.x, sc.y, sr, 0, Math.PI * 2); vctx.moveTo(sc.x - 7, sc.y); vctx.lineTo(sc.x + 7, sc.y); vctx.moveTo(sc.x, sc.y - 7); vctx.lineTo(sc.x, sc.y + 7); vctx.stroke();
+    }
   }
 
   /* ---------- history ---------- */
@@ -503,7 +515,8 @@
   }
 
   var SHAPE_TOOLS = ['rect', 'ellipse', 'line', 'triangle', 'star'];
-  var PAINT_TOOLS = ['brush', 'pencil', 'spray', 'eraser'];
+  var RETOUCH_TOOLS = ['clone', 'blur', 'sharpen', 'smudge', 'dodge', 'burn'];
+  var PAINT_TOOLS = ['brush', 'pencil', 'spray', 'eraser'].concat(RETOUCH_TOOLS);
 
   function onPointerDown(e) {
     if (!state.doc || state.op || state.busy) return;
@@ -544,6 +557,7 @@
     } else if (tool === 'wand') {
       wandSelect(p, selectionMode(e));
     } else if (PAINT_TOOLS.indexOf(tool) >= 0) {
+      if (tool === 'clone' && e.altKey) { e.preventDefault(); setCloneSource(p); return; }
       startPaint(p, tool);
     } else if (tool === 'bucket' || tool === 'magic-eraser') {
       floodAt(p, tool === 'magic-eraser');
@@ -557,7 +571,12 @@
     } else if (SHAPE_TOOLS.indexOf(tool) >= 0) {
       state.op = { type: 'shape', kind: tool, p0: p, layer: null };
     } else if (tool === 'crop') {
-      state.op = { type: 'crop', p0: p };
+      var cr = state.crop;
+      if (cr && cr.w > 0 && p.x >= cr.x && p.x <= cr.x + cr.w && p.y >= cr.y && p.y <= cr.y + cr.h) {
+        state.op = { type: 'cropmove', p0: p, start: { x: cr.x, y: cr.y, w: cr.w, h: cr.h } }; // drag inside to move it
+      } else {
+        state.op = { type: 'crop', p0: p };
+      }
     } else if (tool === 'eyedropper') {
       pickColor(p, e.altKey);
     } else if (tool === 'zoom') {
@@ -633,9 +652,31 @@
       drawGradient(op);
     } else if (op.type === 'shape') {
       dragShape(op, p, e.shiftKey);
+    } else if (op.type === 'cropmove') {
+      var c0 = op.start;
+      state.crop = {
+        x: round(Math.max(0, Math.min(state.doc.w - c0.w, c0.x + p.x - op.p0.x))),
+        y: round(Math.max(0, Math.min(state.doc.h - c0.h, c0.y + p.y - op.p0.y))),
+        w: c0.w, h: c0.h
+      };
+      updateCropUi();
+      requestRender();
     } else if (op.type === 'crop') {
-      var x0 = Math.max(0, Math.min(op.p0.x, p.x)), y0 = Math.max(0, Math.min(op.p0.y, p.y));
-      var x1 = Math.min(state.doc.w, Math.max(op.p0.x, p.x)), y1 = Math.min(state.doc.h, Math.max(op.p0.y, p.y));
+      var dx = p.x - op.p0.x, dy = p.y - op.p0.y, sx = dx < 0 ? -1 : 1, sy = dy < 0 ? -1 : 1;
+      var cw = Math.abs(dx), ch = Math.abs(dy);
+      if (state.cropRatio) {
+        if (cw > ch * state.cropRatio) cw = ch * state.cropRatio; else ch = cw / state.cropRatio;
+        var room = Math.min(sx > 0 ? state.doc.w - op.p0.x : op.p0.x, sy > 0 ? state.doc.h - op.p0.y : op.p0.y);
+        var k = Math.min(1, cw > 0 ? (sx > 0 ? state.doc.w - op.p0.x : op.p0.x) / cw : 1, ch > 0 ? (sy > 0 ? state.doc.h - op.p0.y : op.p0.y) / ch : 1);
+        cw *= k; ch *= k;
+        if (room < 0) { cw = 0; ch = 0; }
+      }
+      var x0 = sx > 0 ? op.p0.x : op.p0.x - cw, y0 = sy > 0 ? op.p0.y : op.p0.y - ch;
+      var x1 = x0 + cw, y1 = y0 + ch;
+      if (!state.cropRatio) {
+        x0 = Math.max(0, Math.min(op.p0.x, p.x)); y0 = Math.max(0, Math.min(op.p0.y, p.y));
+        x1 = Math.min(state.doc.w, Math.max(op.p0.x, p.x)); y1 = Math.min(state.doc.h, Math.max(op.p0.y, p.y));
+      }
       state.crop = { x: round(x0), y: round(y0), w: round(x1 - x0), h: round(y1 - y0) };
       updateCropUi();
       requestRender();
@@ -710,6 +751,7 @@
   /* ---- brush, pencil, spray & eraser ---- */
 
   function startPaint(p, tool) {
+    if (RETOUCH_TOOLS.indexOf(tool) >= 0) return startRetouch(p, tool);
     var erase = tool === 'eraser';
     var target = paintTarget(!erase, 'Paint');
     if (!target) return;
@@ -746,8 +788,138 @@
     }
   }
 
+
+  /* ---- retouch tools: clone stamp, blur, sharpen, smudge, dodge, burn ---- */
+
+  // Per-stamp strength; repeated stamps along a stroke build the effect up.
+  var RETOUCH_STRENGTH = { clone: 1, blur: 0.55, sharpen: 0.4, smudge: 0.6, dodge: 0.18, burn: 0.18 };
+
+  function setCloneSource(p) {
+    state.cloneSrc = p;
+    state.cloneOffset = null; // the next stroke fixes the offset between source and brush
+    toast('Clone source set. Now paint where the copy should go.');
+    requestRender();
+  }
+
+  function startRetouch(p, tool) {
+    var target = paintTarget(false);
+    if (!target) return;
+    var l = target.layer;
+    if (!l.visible) { toast('That layer is hidden.'); return; }
+    if (tool === 'clone' && !state.cloneSrc) { toast('Alt-click (or right-click) the area to copy from first.'); return; }
+    var base = l.canvas, work = newCanvas(base.width, base.height);
+    work.getContext('2d').drawImage(base, 0, 0);
+    l.canvas = work;
+    var scale = (Math.abs(l.scaleX) + Math.abs(l.scaleY)) / 2;
+    var inv = Layers.matrix(l).inverse();
+    var width = Math.max(4, state.brush.size / scale), r = width / 2, pad = Math.ceil(r * 0.3) + 3;
+    var size = Math.ceil(r + pad) * 2;
+    var op = {
+      type: 'paint', retouch: true, tool: tool, layer: l, base: base, work: work, inv: inv,
+      width: width, last: null, size: size, half: size / 2,
+      a: newCanvas(size, size), b: newCanvas(size, size), c: newCanvas(size, size),
+      selMask: state.selection ? selectionInLayer(l) : null
+    };
+    // Feathered round mask: solid in the middle, fading out to the edge.
+    var feather = Math.max(0.3, state.retouchSoft / 100), mctx = op.c.getContext('2d');
+    var g = mctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, r);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(Math.max(0, 1 - feather), 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    op.mask = newCanvas(size, size);
+    op.mask.getContext('2d').fillStyle = g;
+    op.mask.getContext('2d').fillRect(0, 0, size, size);
+    if (tool === 'clone') {
+      if (!state.cloneOffset) state.cloneOffset = { x: state.cloneSrc.x - p.x, y: state.cloneSrc.y - p.y };
+      var q0 = inv.transformPoint(new DOMPoint(p.x, p.y)), s0 = inv.transformPoint(new DOMPoint(p.x + state.cloneOffset.x, p.y + state.cloneOffset.y));
+      op.layerOffset = { x: s0.x - q0.x, y: s0.y - q0.y };
+    }
+    state.op = op;
+    paintTo(p);
+  }
+
+  function retouchTo(op, p) {
+    var q = op.inv.transformPoint(new DOMPoint(p.x, p.y));
+    var from = op.last, r = op.width / 2;
+    if (!from) {
+      stampRetouch(op, q, true);
+    } else {
+      var dist = Math.hypot(q.x - from.x, q.y - from.y), step = Math.max(1, r * (op.tool === 'blur' || op.tool === 'sharpen' ? 0.35 : 0.22));
+      var n = Math.max(1, Math.ceil(dist / step));
+      for (var i = 1; i <= n; i++) stampRetouch(op, { x: from.x + ((q.x - from.x) * i) / n, y: from.y + ((q.y - from.y) * i) / n }, false);
+    }
+    op.last = q;
+    op.layer.rev++;
+    requestRender();
+  }
+
+  function stampRetouch(op, q, first) {
+    var size = op.size, x0 = Math.round(q.x - op.half), y0 = Math.round(q.y - op.half);
+    var wctx = op.work.getContext('2d'), a = op.a.getContext('2d'), b = op.b.getContext('2d');
+    var tool = op.tool, result;
+
+    a.globalCompositeOperation = 'copy';
+    a.drawImage(op.work, x0, y0, size, size, 0, 0, size, size); // what's under the brush now
+    a.globalCompositeOperation = 'source-over';
+
+    if (tool === 'smudge') {
+      if (first) { op.pickup = newCanvas(size, size); op.pickup.getContext('2d').drawImage(op.a, 0, 0); return; }
+      result = op.pickup;
+    } else if (tool === 'clone') {
+      b.globalCompositeOperation = 'copy';
+      b.drawImage(op.base, x0 + op.layerOffset.x, y0 + op.layerOffset.y, size, size, 0, 0, size, size);
+      b.globalCompositeOperation = 'source-over';
+      result = op.b;
+    } else if (tool === 'blur') {
+      var f = Filters.defaults();
+      f.blur = Math.max(1.2, op.width * 0.07);
+      result = Filters.apply(op.a, f);
+    } else if (tool === 'sharpen') {
+      // Sharpen from the pixels as the stroke began, so overlapping stamps converge instead of piling up noise.
+      b.globalCompositeOperation = 'copy';
+      b.drawImage(op.base, x0, y0, size, size, 0, 0, size, size);
+      b.globalCompositeOperation = 'source-over';
+      var sf = Filters.defaults();
+      sf.sharpen = 65;
+      result = Filters.apply(op.b, sf);
+    } else { // dodge / burn
+      b.globalCompositeOperation = 'copy';
+      b.drawImage(op.a, 0, 0);
+      b.globalCompositeOperation = 'soft-light';
+      b.fillStyle = tool === 'dodge' ? '#ffffff' : '#000000';
+      b.fillRect(0, 0, size, size);
+      b.globalCompositeOperation = 'destination-in'; // keep transparent pixels transparent
+      b.drawImage(op.a, 0, 0);
+      b.globalCompositeOperation = 'source-over';
+      result = op.b;
+    }
+
+    // Soft round mask (and the selection, if any), then blend onto the layer.
+    var m = op.tmpMasked || (op.tmpMasked = newCanvas(size, size)), mc = m.getContext('2d');
+    mc.globalCompositeOperation = 'copy';
+    mc.drawImage(result, 0, 0);
+    mc.globalCompositeOperation = 'destination-in';
+    mc.drawImage(op.mask, 0, 0);
+    if (op.selMask) mc.drawImage(op.selMask, x0, y0, size, size, 0, 0, size, size);
+    mc.globalCompositeOperation = 'source-over';
+    wctx.globalAlpha = Math.min(1, RETOUCH_STRENGTH[tool] * state.brush.opacity);
+    wctx.drawImage(m, x0, y0);
+    wctx.globalAlpha = 1;
+
+    if (tool === 'smudge') { // pick up some of what we just touched, so colour drags along
+      var pc = op.pickup.getContext('2d');
+      a.globalCompositeOperation = 'copy';
+      a.drawImage(op.work, x0, y0, size, size, 0, 0, size, size);
+      a.globalCompositeOperation = 'source-over';
+      pc.globalAlpha = 0.5;
+      pc.drawImage(op.a, 0, 0);
+      pc.globalAlpha = 1;
+    }
+  }
+
   function paintTo(p) {
     var op = state.op;
+    if (op.retouch) return retouchTo(op, p);
     var q = op.inv.transformPoint(new DOMPoint(p.x, p.y));
     var from = op.last || q;
     if (op.tool === 'pencil') pencilLine(op, from, q);
@@ -1284,6 +1456,41 @@
     replacePixels(l, function (ctx) { ctx.drawImage(m, 0, 0); });
   }
 
+  // Blur or pixelate only the selected area (to hide faces, number plates or text).
+  function obscureSelected(mode) {
+    if (!state.selection) return;
+    var l = pixelLayerForSelection();
+    if (!l) return;
+    var strength = +$('sel-strength').value;
+    var m = selectionInLayer(l), src = l.canvas, w = src.width, h = src.height;
+    var treated;
+    if (mode === 'blur') {
+      var f = Filters.defaults();
+      f.blur = Math.max(2, Math.round((strength / 100) * Math.min(48, Math.max(8, Math.max(w, h) / 25))));
+      treated = Filters.apply(src, f);
+    } else {
+      var block = Math.max(3, Math.round((strength / 100) * Math.max(8, Math.max(state.selection.bbox.w, state.selection.bbox.h) / 5)));
+      var small = newCanvas(Math.max(1, Math.ceil(w / block)), Math.max(1, Math.ceil(h / block)));
+      var sctx = small.getContext('2d');
+      sctx.imageSmoothingQuality = 'high';
+      sctx.drawImage(src, 0, 0, small.width, small.height);
+      treated = newCanvas(w, h);
+      var tctx = treated.getContext('2d');
+      tctx.imageSmoothingEnabled = false;
+      tctx.drawImage(small, 0, 0, small.width * block, small.height * block);
+    }
+    var piece = newCanvas(w, h), pctx = piece.getContext('2d');
+    pctx.drawImage(treated, 0, 0);
+    pctx.globalCompositeOperation = 'destination-in';
+    pctx.drawImage(m, 0, 0);
+    replacePixels(l, function (ctx) {
+      ctx.globalCompositeOperation = 'destination-out'; // clear the selected part, then lay the treated part in
+      ctx.drawImage(m, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(piece, 0, 0);
+    });
+  }
+
   function copySelectionToLayer() {
     if (!state.selection) return;
     var l = pixelLayerForSelection();
@@ -1565,6 +1772,50 @@
     return mode;
   }
 
+  // Drop shadow / outline controls for the selected layer.
+  function syncFx(l) {
+    var fx = Layers.fxCopy(l.fx);
+    $('fx-shadow-on').checked = fx.shadow.on;
+    $('fx-shadow').hidden = !fx.shadow.on;
+    $('fx-shadow-color').value = fx.shadow.color;
+    setIfIdle('fx-shadow-opacity', round(fx.shadow.opacity * 100));
+    $('fx-shadow-opacity-out').textContent = round(fx.shadow.opacity * 100) + '%';
+    setIfIdle('fx-shadow-blur', fx.shadow.blur);
+    $('fx-shadow-blur-out').textContent = fx.shadow.blur;
+    setIfIdle('fx-shadow-x', fx.shadow.dx);
+    setIfIdle('fx-shadow-y', fx.shadow.dy);
+    $('fx-outline-on').checked = fx.outline.on;
+    $('fx-outline').hidden = !fx.outline.on;
+    $('fx-outline-color').value = fx.outline.color;
+    setIfIdle('fx-outline-width', fx.outline.width);
+    $('fx-outline-width-out').textContent = fx.outline.width;
+  }
+
+  function bindFx() {
+    function on(id, apply, ev) {
+      $(id).addEventListener(ev || 'input', function () {
+        var l = selected();
+        if (!l) return;
+        var f = Layers.fxCopy(l.fx);
+        apply(f, this);
+        l.fx = f; // a fresh object each time keeps history snapshots independent
+        requestRender();
+        syncFx(l);
+        if (ev === 'change') commit();
+      });
+      if (!ev) $(id).addEventListener('change', function () { if (selected()) commit(); });
+    }
+    on('fx-shadow-on', function (f, el) { f.shadow.on = el.checked; }, 'change');
+    on('fx-shadow-color', function (f, el) { f.shadow.color = el.value; });
+    on('fx-shadow-opacity', function (f, el) { f.shadow.opacity = +el.value / 100; });
+    on('fx-shadow-blur', function (f, el) { f.shadow.blur = +el.value; });
+    on('fx-shadow-x', function (f, el) { f.shadow.dx = +el.value || 0; });
+    on('fx-shadow-y', function (f, el) { f.shadow.dy = +el.value || 0; });
+    on('fx-outline-on', function (f, el) { f.outline.on = el.checked; }, 'change');
+    on('fx-outline-color', function (f, el) { f.outline.color = el.value; });
+    on('fx-outline-width', function (f, el) { f.outline.width = +el.value; });
+  }
+
   function renderProps() {
     var l = selected();
     var doc = state.doc;
@@ -1589,6 +1840,7 @@
     $('p-opacity-out').textContent = round(l.opacity * 100) + '%';
     $('p-blend').value = l.blend;
     $('p-raster').hidden = l.type === 'image';
+    syncFx(l);
 
     $('text-props').hidden = l.type !== 'text';
     $('shape-props').hidden = l.type !== 'shape';
@@ -1971,6 +2223,63 @@
     });
   }
 
+  // Chooses a crop shape: fits the biggest box of that ratio inside the current crop (or the whole picture), centred.
+  function setCropRatio(value) {
+    state.cropRatio = value === 'orig' ? (state.doc ? state.doc.w / state.doc.h : 0) : +value;
+    if (!state.doc || !state.cropRatio) return;
+    var box = state.crop && state.crop.w > 1 ? state.crop : { x: 0, y: 0, w: state.doc.w, h: state.doc.h };
+    var w = box.w, h = w / state.cropRatio;
+    if (h > box.h) { h = box.h; w = h * state.cropRatio; }
+    state.crop = { x: round(box.x + (box.w - w) / 2), y: round(box.y + (box.h - h) / 2), w: round(w), h: round(h) };
+    updateCropUi();
+    requestRender();
+  }
+
+  // Moves a layer so one of its edges (or its centre) lines up with the canvas.
+  function snapLayer(l, how) {
+    var b = bounds(l), W = state.doc.w, H = state.doc.h;
+    if (how === 'left') l.x += -b.x;
+    else if (how === 'right') l.x += W - b.r;
+    else if (how === 'hcenter') l.x += W / 2 - (b.x + b.r) / 2;
+    else if (how === 'top') l.y += -b.y;
+    else if (how === 'bottom') l.y += H - b.b;
+    else if (how === 'vcenter') l.y += H / 2 - (b.y + b.b) / 2;
+  }
+
+  // One-click fix: stretches the tones to use the full range and evens out the colour cast.
+  function autoEnhance() {
+    var l = selected();
+    if (!l) return;
+    if (l.type !== 'image') { toast('Auto enhance works on photos and other pixel layers.'); return; }
+    var k = Math.min(1, 256 / Math.max(l.canvas.width, l.canvas.height));
+    var c = newCanvas(Math.max(1, Math.round(l.canvas.width * k)), Math.max(1, Math.round(l.canvas.height * k)));
+    c.getContext('2d').drawImage(l.canvas, 0, 0, c.width, c.height);
+    var d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    var hist = new Uint32Array(256), n = 0, R = 0, B = 0;
+    for (var i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 128) continue;
+      hist[Math.round(0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2])]++;
+      R += d[i]; B += d[i + 2]; n++;
+    }
+    if (n < 16) { toast('Nothing to enhance here.'); return; }
+    var lo = 0, hi = 255, acc = 0;
+    for (lo = 0; lo < 255; lo++) { acc += hist[lo]; if (acc >= n * 0.01) break; }
+    acc = 0;
+    for (hi = 255; hi > 0; hi--) { acc += hist[hi]; if (acc >= n * 0.01) break; }
+    if (hi - lo < 10) { toast('Nothing to enhance here.'); return; }
+    var f = l.filters;
+    var gain = Math.max(1, Math.min(2.2, 239 / (hi - lo)));
+    var offset = 128 - (lo + hi) / 2 - 0.5 / gain;
+    var contrast = (66045 * (gain - 1)) / (259 + 255 * gain) / 2.55;
+    f.brightness = Math.max(-60, Math.min(60, Math.round(offset / 2.55)));
+    f.contrast = gain > 1.04 ? Math.min(70, Math.round(contrast)) : f.contrast;
+    f.saturation = Math.max(f.saturation, 12);
+    f.temperature = Math.max(-25, Math.min(25, Math.round(((B - R) / n) * 0.5 * 1.25)));
+    commit();
+    requestRender();
+    toast('Auto enhanced. Fine-tune the sliders if you like.');
+  }
+
   function bindOptions() {
     $('brush-size').oninput = function () {
       state.brush.size = +this.value;
@@ -1997,6 +2306,18 @@
     });
     styleSelect.onchange = function () { chooseBrushStyle(Brushes.preset(this.value)); };
     syncBrushStyle();
+    $('crop-ratio').onchange = function () { setCropRatio(this.value); };
+    $('adjust-auto').onclick = autoEnhance;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-snap]'), function (btn) {
+      btn.onclick = function () {
+        var l = selected();
+        if (!l || !state.doc) return;
+        snapLayer(l, btn.dataset.snap);
+        commit();
+        requestRender();
+      };
+    });
+    $('retouch-soft').oninput = function () { state.retouchSoft = +this.value; };
     $('spray-density').oninput = function () { state.sprayDensity = +this.value; };
     $('fill-tolerance').oninput = function () {
       state.tolerance = +this.value;
@@ -2013,6 +2334,8 @@
     $('sel-remove').onclick = removeObject;
     $('sel-delete').onclick = deleteSelected;
     $('sel-fill').onclick = fillSelected;
+    $('sel-blur').onclick = function () { obscureSelected('blur'); };
+    $('sel-pixelate').onclick = function () { obscureSelected('pixelate'); };
     $('sel-copy').onclick = copySelectionToLayer;
     $('sel-crop').onclick = cropToSelection;
     $('sel-invert').onclick = invertSelection;
@@ -2102,6 +2425,7 @@
     view.addEventListener('contextmenu', function (e) {
       e.preventDefault();
       if (state.doc && !state.op && (state.tool === 'brush' || state.tool === 'eraser')) openBrushMenu(e);
+      else if (state.doc && !state.op && state.tool === 'clone') setCloneSource(toDoc(e));
     });
     wrap.addEventListener('wheel', function (e) {
       if (!state.doc) return;
@@ -2221,6 +2545,7 @@
   buildAdjustments();
   bindPanels();
   bindOptions();
+  bindFx();
   bindMenu();
   bindCanvas();
   bindKeys();

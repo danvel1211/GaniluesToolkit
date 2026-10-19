@@ -52,13 +52,17 @@
     <div class="opt-group" data-for="move">
       <span class="opt-hint">Drag to move · corners to resize (Shift = free) · round handle to rotate (Shift = 15° steps) · double-click text to edit</span>
     </div>
-    <div class="opt-group" data-for="brush pencil spray eraser">
+    <div class="opt-group" data-for="brush pencil spray eraser clone blur sharpen smudge dodge burn">
       <label>Size <input type="range" id="brush-size" min="1" max="300" value="24"> <output id="brush-size-out">24</output></label>
       <label>Opacity <input type="range" id="brush-opacity" min="1" max="100" value="100"> <output id="brush-opacity-out">100%</output></label>
     </div>
     <div class="opt-group" data-for="brush eraser">
       <label>Style <select id="brush-style" title="Brush style (right-click the canvas for a preview menu)"></select></label>
       <label>Softness <input type="range" id="brush-soft" min="0" max="100" value="0"></label>
+    </div>
+    <div class="opt-group" data-for="clone blur sharpen smudge dodge burn">
+      <label>Softness <input type="range" id="retouch-soft" min="0" max="100" value="50"></label>
+      <span class="opt-hint" id="retouch-hint">Clone: Alt-click (or right-click) to pick the source, then paint · all retouch tools work on the selected pixel layer and stay inside an active selection.</span>
     </div>
     <div class="opt-group" data-for="spray">
       <label>Density <input type="range" id="spray-density" min="1" max="100" value="40"></label>
@@ -89,6 +93,11 @@
       <span class="opt-hint">Click to start typing, or click existing text to edit it · Esc or click outside to finish</span>
     </div>
     <div class="opt-group" data-for="crop">
+      <label>Ratio <select id="crop-ratio" title="Lock the crop to a shape">
+        <option value="0">Free</option><option value="1">Square 1:1</option><option value="0.8">Portrait 4:5</option><option value="1.25">Landscape 5:4</option>
+        <option value="1.5">Photo 3:2</option><option value="0.6667">Photo 2:3</option><option value="1.7778">Wide 16:9</option><option value="0.5625">Story 9:16</option>
+        <option value="0.7071">A4 portrait</option><option value="orig">Original shape</option>
+      </select></label>
       <span class="opt-hint" id="crop-hint">Drag to choose the area to keep</span>
       <button type="button" class="btn small primary" id="crop-apply" disabled>Apply crop</button>
       <button type="button" class="btn small ghost" id="crop-cancel" disabled>Cancel</button>
@@ -107,6 +116,9 @@
       <button type="button" class="btn small primary" id="sel-remove" title="Rebuild the selected area from its surroundings">✨ Remove object</button>
       <button type="button" class="btn small" id="sel-delete" title="Delete (Del)">Delete</button>
       <button type="button" class="btn small" id="sel-fill" title="Fill with the main colour">Fill</button>
+      <button type="button" class="btn small" id="sel-blur" title="Blur the selected area (hide faces, plates, text)">Blur</button>
+      <button type="button" class="btn small" id="sel-pixelate" title="Pixelate the selected area (hide faces, plates, text)">Pixelate</button>
+      <label class="sel-strength" title="Strength of Blur and Pixelate">Strength <input type="range" id="sel-strength" min="1" max="100" value="50"></label>
       <button type="button" class="btn small" id="sel-copy" title="Copy to new layer (Ctrl+J)">To layer</button>
       <button type="button" class="btn small" id="sel-crop">Crop</button>
       <button type="button" class="btn small ghost" id="sel-invert" title="Invert (Ctrl+Shift+I)">Invert</button>
@@ -211,6 +223,36 @@
             <button type="button" class="chip" id="p-fit">Fit to canvas</button>
             <button type="button" class="chip" id="p-raster" hidden>Rasterize</button>
           </div>
+          <div class="chips" id="align-chips" aria-label="Align to canvas">
+            <button type="button" class="chip" data-snap="left" title="Align left edge to the canvas">⇤ Left</button>
+            <button type="button" class="chip" data-snap="hcenter" title="Centre horizontally">⇔ Centre</button>
+            <button type="button" class="chip" data-snap="right" title="Align right edge to the canvas">⇥ Right</button>
+            <button type="button" class="chip" data-snap="top" title="Align top edge to the canvas">⤒ Top</button>
+            <button type="button" class="chip" data-snap="vcenter" title="Centre vertically">⇕ Middle</button>
+            <button type="button" class="chip" data-snap="bottom" title="Align bottom edge to the canvas">⤓ Bottom</button>
+          </div>
+
+          <div class="fx-block" id="fx-block">
+            <div class="fx-head"><label class="switch"><input type="checkbox" id="fx-shadow-on"><span></span></label><b>Drop shadow</b></div>
+            <div class="fx-body" id="fx-shadow" hidden>
+              <div class="field-row">
+                <div class="field narrow"><label for="fx-shadow-color">Colour</label><input type="color" id="fx-shadow-color" value="#000000"></div>
+                <div class="field"><label for="fx-shadow-opacity">Opacity <output id="fx-shadow-opacity-out">50%</output></label><input type="range" id="fx-shadow-opacity" min="0" max="100" value="50"></div>
+              </div>
+              <div class="field"><label for="fx-shadow-blur">Blur <output id="fx-shadow-blur-out">10</output></label><input type="range" id="fx-shadow-blur" min="0" max="50" value="10"></div>
+              <div class="field-row">
+                <div class="field"><label for="fx-shadow-x">Offset X</label><input type="number" id="fx-shadow-x" min="-500" max="500" value="6"></div>
+                <div class="field"><label for="fx-shadow-y">Offset Y</label><input type="number" id="fx-shadow-y" min="-500" max="500" value="6"></div>
+              </div>
+            </div>
+            <div class="fx-head"><label class="switch"><input type="checkbox" id="fx-outline-on"><span></span></label><b>Outline</b></div>
+            <div class="fx-body" id="fx-outline" hidden>
+              <div class="field-row">
+                <div class="field narrow"><label for="fx-outline-color">Colour</label><input type="color" id="fx-outline-color" value="#ffffff"></div>
+                <div class="field"><label for="fx-outline-width">Width <output id="fx-outline-width-out">4</output></label><input type="range" id="fx-outline-width" min="1" max="60" value="4"></div>
+              </div>
+            </div>
+          </div>
 
           <div id="text-props" hidden>
             <div class="field">
@@ -262,7 +304,10 @@
         <div id="adjust-body" hidden>
           <div class="presets" id="presets"></div>
           <div id="sliders"></div>
-          <button type="button" class="btn small ghost" id="adjust-reset">Reset adjustments</button>
+          <div class="row gap">
+            <button type="button" class="btn small" id="adjust-auto" title="Fix brightness, contrast, colour balance and a little saturation in one click">✨ Auto enhance</button>
+            <button type="button" class="btn small ghost" id="adjust-reset">Reset adjustments</button>
+          </div>
         </div>
       </details>
 
