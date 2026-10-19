@@ -12,7 +12,7 @@ Your Google Sheet stays **private**. The app never contains the sheet's link; it
 ## 2. Add the script
 1. Go to <https://script.google.com> → **New project**. Name it "Studiolo activation".
 2. Delete the sample code and paste in everything from `Code.gs` (this folder).
-3. Select the function `setSheetId` and click **Run**; allow the permissions Google asks for. Paste the sheet's ID (the long part of its address between `/d/` and `/edit`).
+3. In `setSheetId`, replace `PASTE-YOUR-SHEET-ID-HERE` with the sheet's ID (the long part of its address between `/d/` and `/edit`, keep the quotes). Save, select `setSheetId` and click **Run**; allow the permissions Google asks for. Then delete the ID from the code and save again.
 
 ## 3. Publish it
 1. **Deploy → New deployment → Web app.**

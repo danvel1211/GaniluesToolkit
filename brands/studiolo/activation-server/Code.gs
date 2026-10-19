@@ -62,8 +62,11 @@ function claim_(code, name) {
   return { status: 'invalid' };
 }
 
-/** Run once from the editor to store the sheet's ID privately. */
+/**
+ * Run once from the editor to store the sheet's ID privately: put the ID (the long part of the
+ * sheet's address between /d/ and /edit) in place of the text below, run this, then delete the ID again.
+ */
 function setSheetId() {
-  var id = Browser.inputBox('Paste the Google Sheet ID (the long part of its address between /d/ and /edit)');
-  if (id && id !== 'cancel') PropertiesService.getScriptProperties().setProperty(SHEET_PROP, id.trim());
+  var id = 'PASTE-YOUR-SHEET-ID-HERE';
+  PropertiesService.getScriptProperties().setProperty(SHEET_PROP, id);
 }
