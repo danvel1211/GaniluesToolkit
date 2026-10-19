@@ -21,7 +21,7 @@
       {
         "href": "about.html",
         "label": "About",
-        "homeLabel": "About Studiolo →"
+        "homeLabel": "About Studiolo \u2192"
       }
     ],
     "extraFiles": {
@@ -60,6 +60,7 @@
     },
     "exclude": [
       "README.md"
-    ]
+    ],
+    "activation": "brands/studiolo/activation.json"
   }
 ]

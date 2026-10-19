@@ -9,7 +9,10 @@
  * happens offline.
  *
  * The person also enters their name when activating. It personalises the app ("Welcome,
- * Maria") but isn't checked against the code: codes are made in advance, before names are known.
+ * Maria"). If an activation address was built in (see activation-server/), the name and code
+ * are sent there once, over HTTPS, so a code that already belongs to someone else is refused;
+ * the licence is then remembered on the device and works offline. Without one, the check is
+ * entirely local and the name isn't tied to the code.
  *
  * Pages are locked until a valid code is entered, except pages marked
  * <html data-license="optional"> (the About page), which only show the licence status.
@@ -31,6 +34,10 @@
     }
     return out;
   }
+  // Where to claim a code (built in by tools/build_editions.py; empty = fully offline).
+  var ACTIVATION = (function () {
+    try { return data.a ? atob(data.a).split('').reverse().join('') : ''; } catch (e) { return ''; }
+  })();
   var lookups = (data.batches || data.b || []).map(function (b) {
     var set = {};
     (b.hashes || blobToHex(b.h)).forEach(function (h) { set[h] = true; });
@@ -73,6 +80,24 @@
       }
     }
     return { ok: false, reason: 'That licence code isn\'t recognised. Check for typos, or contact ' + CONTACT + '.' };
+  }
+
+  // Asks the activation server to claim the code for this name.
+  // Calls back with 'ok', 'used', 'invalid' or 'offline'.
+  function claim(code, name, done) {
+    if (!ACTIVATION) return done('ok');
+    var finished = false;
+    function end(status) { if (!finished) { finished = true; done(status); } }
+    var timer = setTimeout(function () { end('offline'); }, 20000);
+    try {
+      fetch(ACTIVATION, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: 'follow',
+        body: JSON.stringify({ c: code, n: name })
+      }).then(function (res) { return res.json(); }).then(function (j) {
+        clearTimeout(timer);
+        end(j && (j.status === 'ok' || j.status === 'used' || j.status === 'invalid') ? j.status : 'offline');
+      }).catch(function () { clearTimeout(timer); end('offline'); });
+    } catch (e) { clearTimeout(timer); end('offline'); }
   }
 
   /* ---------- storage ---------- */
@@ -154,7 +179,12 @@
         document.createTextNode(' · '),
         el('a', { href: 'about.html', text: 'About Studiolo' })
       ]),
-      el('p', { class: 'license-fine', text: 'Your code is checked on this device. Nothing is sent anywhere.' })
+      el('p', {
+        class: 'license-fine',
+        text: ACTIVATION
+          ? 'Activation checks your name and code once, online. Your files are never uploaded.'
+          : 'Your code is checked on this device. Nothing is sent anywhere.'
+      })
     ]);
     var gate = el('div', { id: 'license-gate' }, [card]);
 
@@ -185,15 +215,30 @@
         input.focus();
         return;
       }
-      save(r.code, name);
-      r.name = name;
-      msg.textContent = 'Welcome, ' + name.split(' ')[0] + '! Studiolo is activated.';
+      var skipServer = r.developer; // the creator's own code never needs the server
       btn.disabled = true;
-      setTimeout(function () {
-        root.classList.remove('license-locked');
-        gate.remove();
-        document.dispatchEvent(new CustomEvent('studiolo-licensed', { detail: r }));
-      }, 700);
+      msg.classList.remove('error');
+      msg.textContent = skipServer ? '' : 'Checking your licence…';
+      (skipServer ? function (c, n, cb) { cb('ok'); } : claim)(r.code, name, function (status) {
+        if (status !== 'ok') {
+          btn.disabled = false;
+          msg.classList.add('error');
+          msg.textContent = status === 'used'
+            ? 'This code is already registered to someone else. Contact ' + CONTACT + ' if that\'s a mistake.'
+            : status === 'invalid'
+              ? 'That licence code isn\'t recognised. Check for typos, or contact ' + CONTACT + '.'
+              : 'Couldn\'t reach the activation service. Connect to the internet once to activate; after that Studiolo works offline.';
+          return;
+        }
+        save(r.code, name);
+        r.name = name;
+        msg.textContent = 'Welcome, ' + name.split(' ')[0] + '! Studiolo is activated.';
+        setTimeout(function () {
+          root.classList.remove('license-locked');
+          gate.remove();
+          document.dispatchEvent(new CustomEvent('studiolo-licensed', { detail: r }));
+        }, 700);
+      });
     });
     document.body.appendChild(gate);
     setTimeout(function () { nameInput.focus(); }, 50);

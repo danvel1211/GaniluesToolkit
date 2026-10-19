@@ -34,7 +34,12 @@ def logo_markup(svg, size, wrapper):
     return wrapper % sized
 
 
+CSP_CONNECT = "connect-src 'self' data: blob:"
+
+
 def brand_text(text, ed, svg):
+    if activation_url(ed):
+        text = text.replace(CSP_CONNECT, CSP_CONNECT + ' https://script.google.com https://script.googleusercontent.com')
     text = text.replace(SOURCE_NAME, ed['name'])
     text = text.replace(SOURCE_TAGLINE, ed['tagline'])
     text = text.replace(SOURCE_THEME_KEY, ed['themeKey'])
@@ -57,13 +62,30 @@ def brand_text(text, ed, svg):
     return text
 
 
-def license_data_js():
+def activation_url(ed):
+    """The private activation address, if one is set up (brands/studiolo/activation.json, git-ignored)."""
+    if not ed.get('activation'):
+        return ''
+    path = os.path.join(ROOT, ed['activation'])
+    if not os.path.exists(path):
+        return ''
+    url = json.loads(read(ed['activation'])).get('url', '').strip()
+    if url and not url.startswith('https://script.google.com/macros/s/'):
+        raise SystemExit('activation url must be a Google Apps Script web app address (https://script.google.com/macros/s/...)')
+    return url
+
+
+def license_data_js(ed=None):
     """The licence fingerprints as one opaque block: no labels, no readable list."""
     text = read('brands/studiolo/license-codes.js')
     batches = json.loads(re.search(r'batches: (\[.*\])\s*\};', text, re.S).group(1))
     compact = [{'i': b['id'], 's': b['salt'],
                 'h': base64.b64encode(b''.join(bytes.fromhex(h) for h in b['hashes'])).decode()} for b in batches]
-    return 'window.STUDIOLO_LICENSE_DATA=' + json.dumps({'b': compact}, separators=(',', ':')) + ';'
+    payload = {'b': compact}
+    url = activation_url(ed) if ed else ''
+    if url:  # stored reversed and base64-encoded so it isn't a readable address in the bundle
+        payload['a'] = base64.b64encode(url[::-1].encode()).decode()
+    return 'window.STUDIOLO_LICENSE_DATA=' + json.dumps(payload, separators=(',', ':')) + ';'
 
 
 def minify(code):
@@ -83,7 +105,7 @@ def minify(code):
 def write_bundle(ed, out):
     parts = []
     for part in ed['bundle']['parts']:
-        parts.append(license_data_js() if part == '@license-data' else read(part))
+        parts.append(license_data_js(ed) if part == '@license-data' else read(part))
     code = '\n;\n'.join(parts)
     for old, new in ed.get('rename', {}).items():
         code = code.replace(old, new)
