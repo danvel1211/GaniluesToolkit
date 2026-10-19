@@ -33,3 +33,6 @@ Then rebuild: `python3 tools/build_exe.py`.
 - The developer code never contacts the server.
 - A customer who reinstalls, switches computers or clears the app's saved data will be told the code is used. To let them in again, clear that row's **Activated by** and **Activated on** cells; they can then activate once more.
 - If you change the script, use **Deploy → Manage deployments → Edit → New version** so the address stays the same.
+
+## After updating `Code.gs`
+Always publish it: **Deploy → Manage deployments → pencil → Version: New version → Deploy**. The app's launch-time check needs the latest script; with an older script the app keeps working for its 7-day offline allowance and then asks users to verify, so redeploy promptly.

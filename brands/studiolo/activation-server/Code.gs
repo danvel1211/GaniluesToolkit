@@ -21,17 +21,34 @@ var DATE_HEADING = 'Activated on';   // filled in by this script (created if mis
 
 function doPost(e) {
   var out = { status: 'error' };
-  var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(20000);
     var body = JSON.parse(e.postData.contents);
-    out = claim_(String(body.c || ''), String(body.n || ''));
+    if (body.a === 'check') {
+      // Read-only and very frequent (every app launch): no queue, and "valid" answers are cached for a few minutes.
+      out = checkCached_(String(body.c || ''), String(body.n || ''));
+    } else {
+      // Claiming a code writes to the sheet, so claims go through one at a time.
+      var lock = LockService.getScriptLock();
+      try {
+        lock.waitLock(20000);
+        out = claim_(String(body.c || ''), String(body.n || ''));
+      } finally {
+        try { lock.releaseLock(); } catch (x) { /* not held */ }
+      }
+    }
   } catch (err) {
     out = { status: 'error' };
-  } finally {
-    try { lock.releaseLock(); } catch (x) { /* not held */ }
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function checkCached_(code, name) {
+  var cache = CacheService.getScriptCache();
+  var key = 'v:' + norm_(code) + ':' + name.replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 40);
+  if (cache.get(key)) return { status: 'valid' };
+  var result = check_(code, name);
+  if (result.status === 'valid') cache.put(key, '1', 300);   // a revoked code stops working within 5 minutes
+  return result;
 }
 
 // Opening the address in a browser shows nothing useful.
@@ -80,6 +97,31 @@ function claim_(code, name) {
     return { status: 'ok' };
   }
   return { status: 'invalid' };
+}
+
+// Called every time the app opens: is this code still registered to this name? Changes nothing.
+// 'valid' = yes; 'revoked' = the code's Activated-by cell was cleared or holds another name.
+function check_(code, name) {
+  var raw = norm_(code);
+  name = name.replace(/\s+/g, ' ').trim();
+  var id = PropertiesService.getScriptProperties().getProperty(SHEET_PROP);
+  var sheet = SpreadsheetApp.openById(id).getSheets()[0];
+  var last = sheet.getLastRow();
+  var width = sheet.getLastColumn();
+  if (last < 2 || width < 1) return { status: 'error' };
+  var headings = sheet.getRange(1, 1, 1, width).getValues()[0].map(function (h) { return String(h).trim(); });
+  var codeCol = column_(sheet, headings, CODE_HEADING, false);
+  var nameCol = column_(sheet, headings, NAME_HEADING, false);
+  if (!codeCol) return { status: 'error' };
+  if (!nameCol) return { status: 'revoked' };
+  var codes = sheet.getRange(2, codeCol, last - 1, 1).getValues();
+  var owners = sheet.getRange(2, nameCol, last - 1, 1).getValues();
+  for (var i = 0; i < codes.length; i++) {
+    if (norm_(codes[i][0]) !== raw) continue;
+    var owner = String(owners[i][0] || '').replace(/\s+/g, ' ').trim();
+    return { status: owner && owner.toLowerCase() === name.toLowerCase() ? 'valid' : 'revoked' };
+  }
+  return { status: 'revoked' };
 }
 
 /**

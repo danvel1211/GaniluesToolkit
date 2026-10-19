@@ -82,22 +82,27 @@
     return { ok: false, reason: 'That licence code isn\'t recognised. Check for typos, or contact ' + CONTACT + '.' };
   }
 
-  // Asks the activation server to claim the code for this name.
-  // Calls back with 'ok', 'used', 'invalid' or 'offline'.
-  function claim(code, name, done) {
-    if (!ACTIVATION) return done('ok');
+  // Asks the activation server something about this code and name.
+  // action 'claim' (first activation) calls back 'ok', 'used', 'invalid' or 'offline';
+  // action 'check' (every launch) calls back 'valid', 'revoked' or 'offline'.
+  function ask(action, code, name, done) {
+    var allowed = action === 'check' ? ['valid', 'revoked'] : ['ok', 'used', 'invalid'];
     var finished = false;
     function end(status) { if (!finished) { finished = true; done(status); } }
     var timer = setTimeout(function () { end('offline'); }, 20000);
     try {
       fetch(ACTIVATION, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: 'follow',
-        body: JSON.stringify({ c: code, n: name })
+        body: JSON.stringify({ a: action, c: code, n: name })
       }).then(function (res) { return res.json(); }).then(function (j) {
         clearTimeout(timer);
-        end(j && (j.status === 'ok' || j.status === 'used' || j.status === 'invalid') ? j.status : 'offline');
+        end(j && allowed.indexOf(j.status) >= 0 ? j.status : 'offline');
       }).catch(function () { clearTimeout(timer); end('offline'); });
     } catch (e) { clearTimeout(timer); end('offline'); }
+  }
+  function claim(code, name, done) {
+    if (!ACTIVATION) return done('ok');
+    ask('claim', code, name, done);
   }
 
   /* ---------- storage ---------- */
@@ -109,8 +114,9 @@
     if (!raw) return null;
     try { return JSON.parse(raw); } catch (e) { return { code: raw, name: '' }; }
   }
-  function save(code, name) {
-    var raw = JSON.stringify({ code: code, name: name });
+  var GRACE_DAYS = 7; // how long Studiolo may run offline between online checks
+  function save(code, name, reg, t) {
+    var raw = JSON.stringify({ code: code, name: name, reg: reg || name, t: t || Date.now() });
     memory = raw;
     try { localStorage.setItem(STORAGE_KEY, raw); } catch (e) { /* kept for this page only */ }
   }
@@ -132,8 +138,8 @@
   }
 
   function setName(name) {
-    var lic = current();
-    if (lic) save(lic.code, cleanName(name));
+    var lic = current(), stored = load();
+    if (lic) save(lic.code, cleanName(name), stored && stored.reg, stored && stored.t);
   }
 
   /* ---------- activation screen ---------- */
@@ -152,7 +158,7 @@
     return n;
   }
 
-  function buildGate() {
+  function buildGate(notice) {
     var icon = document.querySelector('link[rel="icon"]');
     var nameInput = el('input', {
       id: 'license-name', type: 'text', autocomplete: 'name', maxlength: '40',
@@ -230,7 +236,7 @@
               : 'Couldn\'t reach the activation service. Connect to the internet once to activate; after that Studiolo works offline.';
           return;
         }
-        save(r.code, name);
+        save(r.code, name, name, Date.now());
         r.name = name;
         msg.textContent = 'Welcome, ' + name.split(' ')[0] + '! Studiolo is activated.';
         setTimeout(function () {
@@ -240,8 +246,61 @@
         }, 700);
       });
     });
+    if (notice) { msg.textContent = notice; msg.classList.add('error'); }
     document.body.appendChild(gate);
     setTimeout(function () { nameInput.focus(); }, 50);
+  }
+
+  /* ---------- re-checking the licence every time the app opens ---------- */
+
+  var checkedKey = 'studiolo-checked';
+  function checkedThisLaunch() { try { return !!sessionStorage.getItem(checkedKey); } catch (e) { return false; } }
+  function markChecked() { try { sessionStorage.setItem(checkedKey, '1'); } catch (e) { /* storage blocked */ } }
+
+  // Shown when the licence hasn't been verified online for longer than the grace period.
+  function showVerify(retry) {
+    if (document.getElementById('license-gate')) return;
+    root.classList.add('license-locked');
+    var msg = el('p', { class: 'license-msg error', role: 'status', 'aria-live': 'polite', text: 'Connect to the internet to verify your licence. This only takes a moment.' });
+    var btn = el('button', { type: 'button', class: 'btn primary license-btn', text: 'Try again' });
+    btn.addEventListener('click', function () { msg.textContent = 'Checking…'; retry(); });
+    var card = el('div', { class: 'license-card', role: 'dialog', 'aria-modal': 'true' }, [
+      el('h2', { text: 'Verify your licence' }),
+      el('p', { class: 'license-lead', text: 'Studiolo checks your licence every so often. It has been a while since the last check.' }),
+      msg, btn
+    ]);
+    document.body.appendChild(el('div', { id: 'license-gate' }, [card]));
+  }
+  function hideVerify() {
+    var g = document.getElementById('license-gate');
+    if (g && !g.querySelector('form')) { g.remove(); root.classList.remove('license-locked'); }
+  }
+
+  function launchCheck() {
+    var stored = load();
+    if (!ACTIVATION || optional || !licence || licence.developer || !stored || checkedThisLaunch()) return;
+    var last = stored.t || Date.now();
+    if (!stored.t) save(stored.code, stored.name, stored.reg, last); // licences from before checks began start their grace now
+    function run() {
+      ask('check', stored.code, stored.reg || stored.name, function (status) {
+        if (status === 'valid') {
+          markChecked();
+          save(stored.code, (load() || stored).name, stored.reg || stored.name, Date.now());
+          hideVerify();
+        } else if (status === 'revoked') {
+          markChecked();
+          clear();
+          var g = document.getElementById('license-gate');
+          if (g) g.remove();
+          root.classList.add('license-locked');
+          buildGate('This licence is no longer active. Enter a valid licence code, or contact ' + CONTACT + '.');
+        } else if (Date.now() - last > GRACE_DAYS * 864e5) {
+          showVerify(run);
+        }
+      });
+    }
+    if (Date.now() - last > GRACE_DAYS * 864e5) showVerify(run);
+    run();
   }
 
   function buildBadge(r) {
@@ -272,7 +331,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     if (root.classList.contains('license-locked')) buildGate();
-    else if (licence) personalise(licence);
+    else if (licence) { personalise(licence); launchCheck(); }
   });
   document.addEventListener('studiolo-licensed', function (e) { personalise(e.detail); });
 
