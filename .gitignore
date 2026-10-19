@@ -11,3 +11,4 @@ brands/studiolo/app/keydata.go
 brands/studiolo/app/pack/_packbin
 # The private activation address (kept out of the repository).
 brands/studiolo/activation.json
+__pycache__/
