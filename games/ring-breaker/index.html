@@ -33,14 +33,15 @@
     button { font: inherit; color: inherit; cursor: pointer; }
     .mono, .stat b, #pct, #lvl, #dps, .up .val, .up .buy b, .offer .tag, .slot b, .toast { font-family: var(--mono); }
 
-    #app { position: relative; margin: 0 auto; width: 100%; max-width: 520px; height: 100vh; height: 100dvh; background: #02030a; overflow: hidden; }
+    #app { position: relative; margin: 0 auto; width: 100%; max-width: 520px; height: 100vh; height: 100dvh; overflow: hidden; --glow: #1c1440;
+      /* painted once, not every frame: scanlines, hex grid, vignette and the glow behind the rings */
+      background:
+        repeating-linear-gradient(to bottom, rgba(140, 220, 255, 0.03) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at 50% 38%, transparent 50%, rgba(0, 0, 0, 0.6) 100%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='72.75' viewBox='0 0 84 72.75'%3E%3Cg fill='none' stroke='%2350c8ff' stroke-opacity='.07'%3E%3Cpath d='M21 -12.1l21 12.1v24.2l-21 12.1-21-12.1V0z'/%3E%3Cpath d='M63 -12.1l21 12.1v24.2l-21 12.1-21-12.1V0z'/%3E%3Cpath d='M42 24.2l21 12.1v24.2l-21 12.1-21-12.1V36.3z'/%3E%3Cpath d='M0 24.2l21 12.1v24.2L0 72.6l-21-12.1V36.3z'/%3E%3Cpath d='M84 24.2l21 12.1v24.2l-21 12.1-21-12.1V36.3z'/%3E%3C/g%3E%3C/svg%3E"),
+        radial-gradient(circle at 50% 38%, var(--glow) 0%, #04060f 45%, #010207 100%); }
     @media (min-width: 560px) { #app { box-shadow: 0 0 0 1px rgba(34, 228, 255, 0.15), 0 0 90px rgba(34, 228, 255, 0.12), 0 0 160px rgba(180, 107, 255, 0.08); } }
     #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-    /* scanlines and a vignette over the game */
-    #fx { position: absolute; inset: 0; pointer-events: none;
-      background:
-        repeating-linear-gradient(to bottom, rgba(140, 220, 255, 0.035) 0 1px, transparent 1px 3px),
-        radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%); }
 
     /* corner brackets: a futuristic frame for panels and cards */
     .frame { position: relative; }
@@ -50,7 +51,7 @@
         linear-gradient(var(--c), var(--c)) top right / var(--k) var(--w), linear-gradient(var(--c), var(--c)) top right / var(--w) var(--k),
         linear-gradient(var(--c), var(--c)) bottom left / var(--k) var(--w), linear-gradient(var(--c), var(--c)) bottom left / var(--w) var(--k),
         linear-gradient(var(--c), var(--c)) bottom right / var(--k) var(--w), linear-gradient(var(--c), var(--c)) bottom right / var(--w) var(--k);
-      background-repeat: no-repeat; filter: drop-shadow(0 0 4px var(--c)); }
+      background-repeat: no-repeat; }
 
     /* ---- top bar ---- */
     #hud { position: absolute; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 12px) 14px 0; pointer-events: none; }
@@ -78,6 +79,7 @@
 
     #tip { white-space: pre-line; position: absolute; left: 18px; right: 18px; top: 24%; padding: 10px 12px; text-align: center; color: var(--neon); font: 600 13.5px/1.45 var(--mono); background: rgba(4, 12, 24, 0.7); border: 1px solid var(--line); pointer-events: none; opacity: 0; transition: opacity 0.5s; text-shadow: 0 0 8px rgba(34, 228, 255, 0.5); }
     #tip.show { opacity: 1; }
+    #fps { position: absolute; right: 14px; top: 118px; font: 700 11px var(--mono); color: var(--acid); pointer-events: none; text-shadow: 0 0 6px #000; }
     #buffs { position: absolute; left: 14px; top: 120px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
 
     /* ---- bottom ---- */
@@ -107,14 +109,16 @@
     .up .bar em { position: absolute; right: 0; top: -16px; font: normal 800 11px var(--mono); color: var(--neon-2); }
     .up .buy { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; margin-top: 10px; border: 0; border-top: 1px solid var(--line); background: rgba(34, 228, 255, 0.06); font-size: 17px; font-weight: 800; color: #6f86a3; }
     .up .buy svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    .up .buy.can { background: linear-gradient(90deg, #12c2e9, #7a5cff 55%, #c471ed); color: #fff; text-shadow: 0 0 6px rgba(0, 0, 0, 0.4); animation: ready 1.8s ease-in-out infinite; }
-    @keyframes ready { 50% { filter: brightness(1.25); box-shadow: 0 0 18px rgba(122, 92, 255, 0.6); } }
+    .up .buy { position: relative; }
+    .up .buy.can { background: linear-gradient(90deg, #12c2e9, #7a5cff 55%, #c471ed); color: #fff; text-shadow: 0 0 6px rgba(0, 0, 0, 0.4); }
+    .up .buy.can::after { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, 0.2); pointer-events: none; animation: ready 1.8s ease-in-out infinite; }
+    @keyframes ready { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
     .up.maxed .buy { color: var(--acid); background: rgba(182, 255, 59, 0.06); }
 
     /* ---- modals ---- */
     #modals { position: absolute; inset: 0; pointer-events: none; }
     .modal { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 18px 14px; pointer-events: auto; overflow-y: auto; animation: fade 0.25s;
-      background: repeating-linear-gradient(to bottom, rgba(34, 228, 255, 0.03) 0 1px, transparent 1px 4px), rgba(1, 3, 10, 0.86); backdrop-filter: blur(4px); }
+      background: repeating-linear-gradient(to bottom, rgba(34, 228, 255, 0.03) 0 1px, transparent 1px 4px), rgba(1, 3, 10, 0.9); }
     @keyframes fade { from { opacity: 0; } }
     .modal > :first-child { margin-top: auto; } .modal > :last-child { margin-bottom: auto; }
     .modal h2 { margin: 0 0 6px; text-align: center; font: 800 26px/1.15 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: #fff; text-shadow: 0 0 16px var(--neon), 2px 0 0 rgba(255, 63, 209, 0.55), -2px 0 0 rgba(34, 228, 255, 0.55); animation: glitch 3.5s infinite; }
@@ -199,7 +203,6 @@
 <body>
   <div id="app">
     <canvas id="stage" aria-label="Game"></canvas>
-    <div id="fx" aria-hidden="true"></div>
 
     <header id="hud">
       <div id="xp"><i id="xpFill"></i></div>
@@ -216,6 +219,7 @@
 
     <div id="tip"></div>
     <div id="buffs"></div>
+    <div id="fps" hidden></div>
 
     <section id="bottom">
       <div id="dps">DPS: 0</div>

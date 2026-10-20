@@ -34,8 +34,8 @@ OUT = os.path.join(ROOT, 'out')
 TOOLS = os.path.join(OUT, 'android-tools')
 BUILD = os.path.join(OUT, 'android-build')
 
-VERSION_NAME = '1.1.0'
-VERSION_CODE = 2
+VERSION_NAME = '1.1.1'
+VERSION_CODE = 3
 MIN_SDK = 24      # Android 7.0
 TARGET_SDK = 34   # Android 14
 

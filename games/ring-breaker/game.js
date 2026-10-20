@@ -21,7 +21,7 @@
       up: { damage: 0, income: 0, speed: 0, balls: 0 }, cards: {}, order: [],
       theme: 'cyber', skin: 'white', themes: ['cyber', 'gold'], skins: ['white'],
       sound: true, vibrate: true, lastSeen: Date.now(), cps: 0, broken: 0, bestStage: 1,
-      pending: 0, tipSeen: false, seconds: 0
+      pending: 0, tipSeen: false, seconds: 0, gfx: 'auto', showFps: false
     };
   }
 
@@ -314,6 +314,9 @@
     G.balls = [];
     showChests(done, function () {
       state.stage = done + 1;
+      pathCache = {}; // shapes of the old stage's rings are no longer needed
+      tickCache = {};
+      G.segCache = {};
       state.bestStage = Math.max(state.bestStage, state.stage);
       state.ring = 0;
       state.hp = ringMax();
@@ -450,9 +453,20 @@
    * Drawing
    * ============================================================ */
 
+  // Drawing resolution. Pixels drawn per frame are what slow phones down most, so "auto" starts at
+  // 1.5× (the glow art stays sharp) and steps down by itself if the game can't hold ~60 FPS.
+  var Q = { dpr: 1.5, low: false };
+  function setQuality() {
+    var device = window.devicePixelRatio || 1;
+    if (state.gfx === 'high') { Q.dpr = Math.min(device, 2); Q.low = false; }
+    else if (state.gfx === 'low') { Q.dpr = 1; Q.low = true; }
+    else { Q.dpr = Math.min(device, 1.5); Q.low = false; }
+    resize();
+  }
+
   function resize() {
     var r = canvas.getBoundingClientRect();
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    dpr = Math.max(1, Math.min(Q.dpr, window.devicePixelRatio || 1));
     W = r.width;
     H = r.height;
     canvas.width = Math.round(W * dpr);
@@ -479,13 +493,15 @@
     return list;
   }
 
-  /* ---- background: stars streaming out of the centre, and a faint hex grid ---- */
+  /* ---- background: stars streaming out of the centre (the hex grid and glow are static CSS) ---- */
 
   function newStar(anywhere) {
     return { a: Math.random() * TAU, d: anywhere ? Math.random() : 0.02 + Math.random() * 0.05, v: 0.03 + Math.random() * 0.09, z: Math.random() };
   }
   function updateStars(dt) {
-    if (!G.stars.length) for (var i = 0; i < 150; i++) G.stars.push(newStar(true));
+    var want = Q.low ? 50 : 110;
+    while (G.stars.length < want) G.stars.push(newStar(true));
+    if (G.stars.length > want) G.stars.length = want;
     for (var k = 0; k < G.stars.length; k++) {
       var st = G.stars[k];
       st.d += st.v * dt * (0.35 + st.d * 1.6);
@@ -493,65 +509,72 @@
     }
   }
 
-  var hexPattern = null;
-  function hexes() {
-    if (hexPattern) return hexPattern;
-    var w = 42, h = 72.75, c = document.createElement('canvas');
-    c.width = w * 2;
-    c.height = h;
-    var x = c.getContext('2d');
-    x.strokeStyle = 'rgba(80, 200, 255, 0.07)';
-    x.lineWidth = 1;
-    function hex(cx, cy) {
-      x.beginPath();
-      for (var i = 0; i < 6; i++) {
-        var an = Math.PI / 6 + (i * Math.PI) / 3;
-        x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(an) * 24.25, cy + Math.sin(an) * 24.25);
-      }
-      x.closePath();
-      x.stroke();
-    }
-    hex(w / 2, 0); hex(w / 2 + w, 0); hex(w / 2, h); hex(w / 2 + w, h); hex(w, h / 2); hex(0, h / 2); hex(2 * w, h / 2);
-    hexPattern = ctx.createPattern(c, 'repeat');
-    return hexPattern;
-  }
-
-  function strokeSegs(segs, from, to, r, rot) {
+  // Ring shapes are built once and reused every frame (rotation is applied with a transform).
+  var pathCache = {};
+  function ringPath(stage, i, from, to) {
+    var key = stage + ':' + i + ':' + from + ':' + to;
+    var p = pathCache[key];
+    if (p) return p;
+    var segs = segments(stage, i), r = Core.ringRadius(i);
+    p = new Path2D();
     for (var s = from; s < to; s++) {
-      ctx.beginPath();
-      ctx.arc(0, 0, r, segs[s].a0 + rot, segs[s].a1 + rot);
-      ctx.stroke();
+      p.moveTo(Math.cos(segs[s].a0) * r, Math.sin(segs[s].a0) * r);
+      p.arc(0, 0, r, segs[s].a0, segs[s].a1);
     }
+    pathCache[key] = p;
+    return p;
+  }
+  var tickCache = {};
+  function tickPaths(i) {
+    if (tickCache[i]) return tickCache[i];
+    var r0 = Core.ringRadius(i) + Core.THICK * 1.3, major = new Path2D(), minor = new Path2D();
+    for (var t = 0; t < 72; t++) {
+      var an = (t / 72) * TAU, big = t % 6 === 0, p = big ? major : minor, r1 = r0 + (big ? 7 : 3.5);
+      p.moveTo(Math.cos(an) * r0, Math.sin(an) * r0);
+      p.lineTo(Math.cos(an) * r1, Math.sin(an) * r1);
+    }
+    tickCache[i] = { major: major, minor: minor };
+    return tickCache[i];
+  }
+  // Soft glow sprite for the ball, drawn once per colour instead of a gradient every frame.
+  var haloCache = {};
+  function halo(color) {
+    if (haloCache[color]) return haloCache[color];
+    var c = document.createElement('canvas');
+    c.width = c.height = 64;
+    var x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, color);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = g;
+    x.fillRect(0, 0, 64, 64);
+    haloCache[color] = c;
+    return c;
   }
 
   function draw() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, W, H);
     var th = THEMES[state.theme] || THEMES.cyber;
-    var sx = (Math.random() - 0.5) * G.shake, sy = (Math.random() - 0.5) * G.shake;
+    var sx = G.shake > 0.3 ? (Math.random() - 0.5) * G.shake : 0, sy = G.shake > 0.3 ? (Math.random() - 0.5) * G.shake : 0;
     var maxR = Math.hypot(W, H) / 2;
 
-    // deep space
-    var bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, maxR * 1.1);
-    bg.addColorStop(0, mix(th.b, '#02030a', 0.78));
-    bg.addColorStop(0.45, '#04060f');
-    bg.addColorStop(1, '#010207');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = hexes();
-    ctx.fillRect(0, 0, W, H);
-
+    // stars, in three batches (one stroke each) instead of one stroke per star
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
-    for (var k = 0; k < G.stars.length; k++) {
-      var st = G.stars[k], d = st.d * maxR, len = 2 + st.v * st.d * 60;
-      var x0 = CX + Math.cos(st.a) * d, y0 = CY + Math.sin(st.a) * d;
-      ctx.strokeStyle = st.z > 0.7 ? th.a : st.z > 0.4 ? th.b : '#ffffff';
-      ctx.globalAlpha = Math.min(1, st.d * 2) * (0.25 + st.z * 0.55);
-      ctx.lineWidth = 0.6 + st.z * 1.2;
+    var groups = [[th.a, 0.55, 1.6], [th.b, 0.45, 1.2], ['#ffffff', 0.32, 0.8]];
+    for (var gi = 0; gi < 3; gi++) {
+      ctx.strokeStyle = groups[gi][0];
+      ctx.globalAlpha = groups[gi][1];
+      ctx.lineWidth = groups[gi][2];
       ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.lineTo(x0 - Math.cos(st.a) * len, y0 - Math.sin(st.a) * len);
+      for (var k = gi; k < G.stars.length; k += 3) {
+        var st = G.stars[k], d = st.d * maxR, len = Q.low ? 1.5 : 2 + st.v * st.d * 60;
+        var cs = Math.cos(st.a), sn = Math.sin(st.a), x0 = CX + cs * d, y0 = CY + sn * d;
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x0 - cs * len, y0 - sn * len);
+      }
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -563,73 +586,69 @@
     ctx.lineCap = 'round';
 
     var n = ringCount(), limit = Math.hypot(W, H) / SCALE;
-    var intro = 1 - Math.pow(1 - G.intro, 3);
+    var intro = 1 - Math.pow(1 - G.intro, 3), zoom = 0.7 + 0.3 * intro;
     var last = Math.min(n - 1, state.ring + 22);
+    if (zoom !== 1) ctx.scale(zoom, zoom);
 
-    // rings from the outside in, so the current ring is drawn on top
-    for (var i = last; i >= state.ring; i--) {
-      var r = Core.ringRadius(i) * (0.7 + 0.3 * intro);
-      if (r > limit) continue;
-      var segs = segments(state.stage, i), rot = G.time * segs.speed;
-      var cur = i === state.ring;
+    // outer rings: one thin stroke each (plus a soft glow on the nearest few)
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = last; i > state.ring; i--) {
+      if (Core.ringRadius(i) * zoom > limit) continue;
+      var segs = segments(state.stage, i), path = ringPath(state.stage, i, 0, segs.length);
       var fade = Math.max(0.22, 1 - (i - state.ring) * 0.045) * intro;
-      var col = ringColor(i);
-
-      if (!cur) {
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = col;
-        ctx.globalAlpha = fade * 0.18;
-        ctx.lineWidth = Core.THICK * 1.6;
-        strokeSegs(segs, 0, segs.length, r, rot);
-        ctx.globalAlpha = fade * 0.8;
-        ctx.lineWidth = Core.THICK * 0.42;
-        strokeSegs(segs, 0, segs.length, r, rot);
-        ctx.globalCompositeOperation = 'source-over';
-        continue;
+      ctx.save();
+      ctx.rotate(G.time * segs.speed);
+      ctx.strokeStyle = ringColor(i);
+      if (!Q.low && i - state.ring <= 4) {
+        ctx.globalAlpha = fade * 0.16;
+        ctx.lineWidth = Core.THICK * 1.5;
+        ctx.stroke(path);
       }
+      ctx.globalAlpha = fade * 0.8;
+      ctx.lineWidth = Core.THICK * 0.42;
+      ctx.stroke(path);
+      ctx.restore();
+    }
 
-      var alive = Math.max(0, Math.min(1, state.hp / ringMax())), aliveCount = Math.ceil(alive * segs.length);
-      // broken parts
+    // the ring being broken
+    if (state.ring < n) {
+      var cs2 = segments(state.stage, state.ring), crot = G.time * cs2.speed, col = ringColor(state.ring);
+      var alive = Math.max(0, Math.min(1, state.hp / ringMax())), aliveCount = Math.ceil(alive * cs2.length);
+      var on = ringPath(state.stage, state.ring, 0, aliveCount), off = ringPath(state.stage, state.ring, aliveCount, cs2.length);
+      ctx.save();
+      ctx.rotate(crot);
+      ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = intro;
       ctx.strokeStyle = 'rgba(120, 140, 175, 0.16)';
       ctx.lineWidth = Core.THICK * 0.55;
-      strokeSegs(segs, aliveCount, segs.length, r, rot);
-      // neon glow, then a bright core line
+      ctx.stroke(off);
       ctx.globalCompositeOperation = 'lighter';
-      var glowCol = G.burn ? '#ff7a1a' : col;
-      ctx.strokeStyle = glowCol;
-      ctx.globalAlpha = (0.16 + G.pulse * 0.22) * intro;
-      ctx.lineWidth = Core.THICK * 3.4;
-      strokeSegs(segs, 0, aliveCount, r, rot);
+      ctx.strokeStyle = G.burn ? '#ff7a1a' : col;
+      if (!Q.low) {
+        ctx.globalAlpha = (0.14 + G.pulse * 0.2) * intro;
+        ctx.lineWidth = Core.THICK * 3;
+        ctx.stroke(on);
+      }
       ctx.globalAlpha = (0.4 + G.pulse * 0.3) * intro;
-      ctx.lineWidth = Core.THICK * 1.6;
-      strokeSegs(segs, 0, aliveCount, r, rot);
+      ctx.lineWidth = Core.THICK * 1.5;
+      ctx.stroke(on);
       ctx.globalAlpha = intro;
       ctx.strokeStyle = mix(col, '#ffffff', 0.55);
       ctx.lineWidth = Core.THICK * 0.7 + G.pulse * 2;
-      strokeSegs(segs, 0, aliveCount, r, rot);
-      // tech ticks around the outside, turning the other way
+      ctx.stroke(on);
+      ctx.restore();
+
+      // tech ticks, turning the other way
+      var tk = tickPaths(state.ring);
+      ctx.save();
+      ctx.rotate(-G.time * 0.25);
       ctx.strokeStyle = col;
       ctx.lineWidth = 1.4;
-      var trot = -G.time * 0.25;
-      for (var t = 0; t < 72; t++) {
-        var an = (t / 72) * TAU + trot, major = t % 6 === 0;
-        var r0 = r + Core.THICK * 1.3, r1 = r0 + (major ? 7 : 3.5);
-        ctx.globalAlpha = (major ? 0.55 : 0.25) * intro;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(an) * r0, Math.sin(an) * r0);
-        ctx.lineTo(Math.cos(an) * r1, Math.sin(an) * r1);
-        ctx.stroke();
-      }
+      ctx.globalAlpha = 0.55 * intro;
+      ctx.stroke(tk.major);
+      if (!Q.low) { ctx.globalAlpha = 0.25 * intro; ctx.stroke(tk.minor); }
+      ctx.restore();
       ctx.globalCompositeOperation = 'source-over';
-      // dotted guide just inside the ring
-      ctx.globalAlpha = 0.28 * intro;
-      ctx.setLineDash([1.5, 7]);
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, r - Core.THICK * 1.7, -rot * 0.6, -rot * 0.6 + TAU);
-      ctx.stroke();
-      ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
 
@@ -654,12 +673,6 @@
       ctx.beginPath();
       ctx.arc(0, 0, sw.r + k * (sw.small ? 70 : 110), 0, TAU);
       ctx.stroke();
-      if (!sw.small) {
-        ctx.globalAlpha = Math.max(0, 1 - k) * 0.4;
-        ctx.beginPath();
-        ctx.arc(0, 0, sw.r + k * 60, 0, TAU);
-        ctx.stroke();
-      }
     });
 
     // bombs
@@ -703,25 +716,24 @@
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'rgba(120, 140, 175, 0.18)';
       ctx.beginPath(); ctx.arc(0, 0, gR, 0, TAU); ctx.stroke();
-      ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = hpCol;
       ctx.globalAlpha = 0.85;
       ctx.beginPath(); ctx.arc(0, 0, gR, -Math.PI / 2, -Math.PI / 2 + frac * TAU); ctx.stroke();
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = '700 9px ' + MONO;
       ctx.fillStyle = hpCol;
       ctx.globalAlpha = 0.75;
       ctx.fillText(boss ? 'BOSS' : jack ? 'JACKPOT ×5' : 'HP', 0, -gR * 0.42);
-      ctx.globalAlpha = 0.9;
+      var hpText = Core.fmt(Math.ceil(state.hp));
       ctx.font = '800 ' + Math.round(Math.max(18, Math.min(30, gR * 0.62))) + 'px ' + MONO;
+      ctx.globalAlpha = 0.3; // a cheap glow: a wide coloured outline instead of a blur
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = hpCol;
+      ctx.strokeText(hpText, 0, 3);
+      ctx.globalAlpha = 0.95;
       ctx.fillStyle = '#e8f6ff';
-      ctx.shadowColor = hpCol;
-      ctx.shadowBlur = 12;
-      ctx.fillText(Core.fmt(Math.ceil(state.hp)), 0, 3);
-      ctx.shadowBlur = 0;
+      ctx.fillText(hpText, 0, 3);
       ctx.globalAlpha = 1;
     }
     ctx.restore();
@@ -733,7 +745,8 @@
     var skin = (SKINS[state.skin] || SKINS.white).color;
     var glowSkin = state.skin === 'white' ? th.a : skin;
     ctx.globalCompositeOperation = 'lighter';
-    G.parts.forEach(function (p) {
+    for (var pi = 0; pi < G.parts.length; pi++) {
+      var p = G.parts[pi];
       ctx.globalAlpha = Math.max(0, 1 - p.t / p.life);
       if (p.shard) {
         ctx.strokeStyle = p.c;
@@ -744,42 +757,34 @@
         ctx.stroke();
       } else {
         ctx.fillStyle = p.c;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, TAU);
-        ctx.fill();
+        ctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
       }
-    });
+    }
+    var glow = halo(glowSkin), hr = Core.BALL_R * 3.4;
     G.balls.forEach(function (b) {
-      // light trail
       var tr = b.trail;
+      ctx.strokeStyle = glowSkin;
       for (var i2 = 2; i2 < tr.length; i2 += 2) {
         var q2 = i2 / tr.length;
         ctx.globalAlpha = q2 * 0.55;
-        ctx.strokeStyle = glowSkin;
         ctx.lineWidth = Core.BALL_R * 1.4 * q2;
         ctx.beginPath();
         ctx.moveTo(tr[i2 - 2], tr[i2 - 1]);
         ctx.lineTo(tr[i2], tr[i2 + 1]);
         ctx.stroke();
       }
-      // halo
-      var halo = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, Core.BALL_R * 3.4);
-      halo.addColorStop(0, glowSkin);
-      halo.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = halo;
-      ctx.beginPath(); ctx.arc(b.x, b.y, Core.BALL_R * 3.4, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(glow, b.x - hr, b.y - hr, hr * 2, hr * 2);
     });
     ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
     G.balls.forEach(function (b) {
-      ctx.globalAlpha = 1;
       ctx.fillStyle = skin;
       ctx.beginPath(); ctx.arc(b.x, b.y, Core.BALL_R, 0, TAU); ctx.fill();
       ctx.strokeStyle = glowSkin;
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(b.x, b.y, Core.BALL_R + 3, G.time * 6, G.time * 6 + Math.PI * 1.2); ctx.stroke();
     });
-    ctx.globalAlpha = 1;
     ctx.restore();
 
     // screen flash when a ring breaks
@@ -795,18 +800,15 @@
     // floating numbers
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(0, 4, 12, 0.85)';
     G.texts.forEach(function (tx) {
       ctx.globalAlpha = Math.max(0, 1 - tx.t / 0.9);
       ctx.font = '800 ' + tx.z + 'px ' + MONO;
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = 'rgba(0, 4, 12, 0.85)';
       var x = CX + tx.x * SCALE, y = CY + tx.y * SCALE;
       ctx.strokeText(tx.s, x, y);
       ctx.fillStyle = tx.c;
-      ctx.shadowColor = tx.c;
-      ctx.shadowBlur = tx.z > 16 ? 10 : 0;
       ctx.fillText(tx.s, x, y);
-      ctx.shadowBlur = 0;
     });
     ctx.globalAlpha = 1;
   }
@@ -886,7 +888,8 @@
       if (u.lv.textContent !== lvText) u.lv.textContent = lvText;
       var v = u.value(l);
       if (u.val.textContent !== v) u.val.textContent = v;
-      u.fill.style.width = Math.round(u.bar(l) * 100) + '%';
+      var wv = Math.round(u.bar(l) * 100) + '%';
+      if (u.fill.style.width !== wv) u.fill.style.width = wv;
       if (maxed) {
         u.price.textContent = 'MAX';
         u.btn.disabled = true;
@@ -1118,6 +1121,10 @@
         } else if (tab === 'settings') {
           body += '<div class="set"><span>Sound</span><button class="toggle" data-set="sound" aria-pressed="' + state.sound + '" aria-label="Sound"></button></div>' +
             '<div class="set"><span>Vibration</span><button class="toggle" data-set="vibrate" aria-pressed="' + state.vibrate + '" aria-label="Vibration"></button></div>' +
+            '<div class="set"><span>Graphics</span><span>' + ['auto', 'high', 'low'].map(function (g) {
+              return '<button class="btn small" data-gfx="' + g + '" style="width:auto;display:inline-flex;margin-left:6px;' + (state.gfx === g ? '' : 'opacity:.45') + '">' + g + '</button>';
+            }).join('') + '</span></div>' +
+            '<div class="set"><span>Show FPS</span><button class="toggle" data-set="showFps" aria-pressed="' + state.showFps + '" aria-label="Show FPS"></button></div>' +
             '<div class="set"><span>Erase all progress</span><button class="btn small" id="reset" style="width:auto">Reset</button></div>' +
             '<p class="hint" style="margin-top:12px">Your progress is saved on this device only. Nothing is sent anywhere.</p>';
         } else {
@@ -1136,6 +1143,7 @@
             var k = b.dataset.theme, t = THEMES[k];
             if (state.themes.indexOf(k) < 0) { if (state.gems < t.cost) return; state.gems -= t.cost; state.themes.push(k); sfx.buy(); }
             state.theme = k;
+            applyThemeGlow();
             render();
           };
         });
@@ -1148,7 +1156,15 @@
           };
         });
         Array.prototype.forEach.call(m.querySelectorAll('[data-set]'), function (b) {
-          b.onclick = function () { state[b.dataset.set] = !state[b.dataset.set]; if (b.dataset.set === 'sound' && state.sound) sfx.buy(); render(); };
+          b.onclick = function () {
+            state[b.dataset.set] = !state[b.dataset.set];
+            if (b.dataset.set === 'sound' && state.sound) sfx.buy();
+            if (b.dataset.set === 'showFps') $('fps').hidden = !state.showFps;
+            render();
+          };
+        });
+        Array.prototype.forEach.call(m.querySelectorAll('[data-gfx]'), function (b) {
+          b.onclick = function () { state.gfx = b.dataset.gfx; fpsWindows = 0; setQuality(); render(); };
         });
         var reset = m.querySelector('#reset');
         if (reset) reset.onclick = function () {
@@ -1182,15 +1198,36 @@
     checkLevelUp();
   }
 
-  var lastT = 0, hudT = 0;
+  var lastT = 0, hudT = 0, fpsT = 0, fpsN = 0, fpsWindows = 0, modalT = 0;
   function frame(now) {
-    var dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
+    var raw = (now - lastT) / 1000 || 0.016, dt = Math.min(0.05, raw);
     lastT = now;
     update(dt);
-    draw();
+    // Under a menu the game is paused: after the fade-in, stop redrawing it (saves battery).
+    modalT = G.modals > 0 ? modalT + dt : 0;
+    if (modalT < 0.6) draw();
     hudT += dt;
     if (hudT > 0.1) { hudT = 0; updateHud(); }
+    watchFps(raw);
     requestAnimationFrame(frame);
+  }
+
+  // Measures the frame rate; in "auto" quality, steps the resolution down until the game runs smoothly.
+  function watchFps(raw) {
+    if (G.modals > 0 || document.hidden || raw > 0.5) return;
+    fpsT += raw;
+    fpsN++;
+    if (fpsT < 2) return;
+    var fps = fpsN / fpsT;
+    fpsT = 0;
+    fpsN = 0;
+    fpsWindows++;
+    var el = $('fps');
+    el.hidden = !state.showFps;
+    if (state.showFps) el.textContent = Math.round(fps) + ' FPS · ' + dpr.toFixed(2) + '×' + (Q.low ? ' · lite' : '');
+    if (state.gfx !== 'auto' || fpsWindows < 2 || !G.started) return; // let things settle first
+    if (fps < 50 && Q.dpr > 1) { Q.dpr = Math.max(1, Q.dpr - 0.25); resize(); }
+    else if (fps < 45 && !Q.low) { Q.low = true; }
   }
 
   canvas.addEventListener('pointerdown', function (e) {
@@ -1238,7 +1275,12 @@
   }
   setInterval(function () { if (G.started) { updateCps(); save(); } }, 5000);
 
-  resize();
+  function applyThemeGlow() {
+    var th = THEMES[state.theme] || THEMES.cyber;
+    $('app').style.setProperty('--glow', mix(th.b, '#02030a', 0.78));
+  }
+  applyThemeGlow();
+  setQuality();
   buildCards();
   buildSlots();
   refreshMods();
