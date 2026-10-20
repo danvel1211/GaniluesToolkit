@@ -82,6 +82,13 @@ python3 tools/build_editions.py
 
 The script swaps in each edition's name, tagline, logo, favicon and colours, so new features only need to be written once. To give Off the Clock Creative Suite a logo later, add an SVG and point its `logo` entry in `brands/editions.json` at it. Logos go where the `<!-- brand-logo -->` placeholders are in each page.
 
+## Games
+
+`games/ring-breaker/` is **Ring Breaker**, an idle game, separate from the creative tools and left out of both editions. A ball bounces inside rings; every hit damages the ring, and when its HP number hits zero the ball escapes to the next, bigger ring. Cash buys upgrades (Damage, Cash Income, Ball Speed, Extra Ball), each level-up offers three cards (Power, Fortune, Swift, Prospector, Crit, Burn, Bomb, Lightning, Twin, Finisher; Power unlocks the combat cards), bosses and chests drop keys and gems, and it keeps earning while you're away.
+
+- `core.js` holds the rules and balance (tested with `Core.simulate`), `game.js` the drawing, sound, menus and saving.
+- `python3 tools/build_game.py` builds one self-contained file, `out/Ring-Breaker.html`, that works offline on a phone or PC. Progress is saved in the browser on the device; nothing is sent anywhere.
+
 ## Privacy
 
 - **Nothing is uploaded and nothing is downloaded from the internet.** Every library, icon and font the app uses ships inside this folder (the handwriting fonts for typed signatures are in `fonts/`). There are no CDNs, web fonts, analytics, cookies or trackers.

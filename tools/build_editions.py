@@ -19,7 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE_NAME = 'Off the Clock Creative Suite'
 SOURCE_TAGLINE = 'Private creative and file tools that run in your browser.'
 SOURCE_THEME_KEY = 'offtheclock-theme'
-SKIP = {'.git', 'dist', 'out', 'tools', 'brands', '.gitignore'}
+SKIP = {'.git', 'dist', 'out', 'games', 'tools', 'brands', '.gitignore'}
 TEXT_EXT = ('.html', '.js', '.css', '.md', '.txt', '.json')
 
 

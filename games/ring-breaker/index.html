@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Nothing is loaded from or sent to the internet: the whole game runs on this device. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Ring Breaker</title>
+  <style>
+    :root {
+      --gold: #ffd43b;
+      --gold-2: #f08c00;
+      --panel: #0b0b0d;
+      --line: #2a2a30;
+      --text: #f4f4f6;
+      --muted: #8d8d99;
+      --common: #e5e7eb;
+      --rare: #4dabf7;
+      --epic: #b197fc;
+      --legendary: #ffd43b;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; background: #040405; color: var(--text); overflow: hidden; overscroll-behavior: none; }
+    body { font: 600 15px/1.3 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+
+    #app { position: relative; margin: 0 auto; width: 100%; max-width: 520px; height: 100vh; height: 100dvh; background: #000; overflow: hidden; }
+    @media (min-width: 560px) { #app { box-shadow: 0 0 0 1px #17171b, 0 0 80px rgba(240, 140, 0, 0.12); } }
+    #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+    /* ---- top bar ---- */
+    #hud { position: absolute; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 12px) 14px 0; pointer-events: none; }
+    #xp { height: 6px; border-radius: 99px; background: #26262c; overflow: hidden; }
+    #xp i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--gold), var(--gold-2)); transition: width 0.25s; }
+    .hud-row { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 12px; }
+    .stats { display: grid; gap: 4px; }
+    .stat { display: flex; align-items: center; gap: 8px; font-size: 21px; font-weight: 800; letter-spacing: 0.01em; text-shadow: 0 2px 8px #000; }
+    .stat svg { width: 24px; height: 24px; flex: none; fill: none; stroke: #e5e5ea; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .stat.keys { font-size: 16px; color: #c9c9d2; }
+    .stat.keys svg { width: 20px; height: 20px; }
+    .center { text-align: center; padding-top: 2px; text-shadow: 0 2px 8px #000; }
+    .center small { display: block; font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #e7e7ee; }
+    #pct { display: block; font-size: 24px; font-weight: 900; color: #ff3b30; line-height: 1.1; }
+    .right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto; }
+    #lvl { font-size: 14px; font-weight: 800; letter-spacing: 0.06em; color: #d8d8e0; }
+    #menuBtn { width: 44px; height: 38px; display: grid; place-items: center; border: 0; background: none; }
+    #menuBtn span, #menuBtn span::before, #menuBtn span::after { display: block; width: 28px; height: 3px; border-radius: 3px; background: #fff; content: ""; position: relative; }
+    #menuBtn span::before { position: absolute; top: -9px; }
+    #menuBtn span::after { position: absolute; top: 9px; }
+
+    #tip { white-space: pre-line; position: absolute; left: 14px; right: 14px; top: 26%; text-align: center; color: #ffe27a; font-size: 15px; text-shadow: 0 2px 10px #000; pointer-events: none; opacity: 0; transition: opacity 0.5s; }
+    #tip.show { opacity: 1; }
+    #buffs { position: absolute; left: 14px; top: 120px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+
+    /* ---- bottom ---- */
+    #bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 12px calc(env(safe-area-inset-bottom) + 12px); }
+    #dps { display: inline-block; padding: 6px 12px; border-radius: 10px; background: rgba(20, 20, 24, 0.85); border: 2px solid #2b2b31; font-size: 19px; font-weight: 800; color: #b9b9c2; }
+    #slots { display: flex; gap: 8px; margin: 10px 0 12px; }
+    .slot { position: relative; width: 48px; height: 48px; border-radius: 11px; border: 2px solid var(--line); background: rgba(14, 14, 17, 0.9); display: grid; place-items: center; padding: 0; }
+    .slot.empty { opacity: 0.45; }
+    .slot svg { width: 28px; height: 28px; }
+    .slot b { position: absolute; right: 3px; bottom: 1px; font-size: 11px; font-weight: 900; color: #fff; text-shadow: 0 1px 3px #000; }
+    .slot.common { border-color: #6b6f78; } .slot.rare { border-color: #3b82c4; } .slot.epic { border-color: #7c5cd6; } .slot.legendary { border-color: #d9a400; }
+    #slotInfo { min-height: 18px; margin: -6px 0 8px; font-size: 13px; color: #c9c9d2; }
+
+    #cards { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 2px; scrollbar-width: none; scroll-snap-type: x proximity; }
+    #cards::-webkit-scrollbar { display: none; }
+    .up { flex: 0 0 132px; scroll-snap-align: start; border: 3px solid #fff; border-radius: 14px; background: #050506; text-align: center; overflow: hidden; }
+    .up h3 { margin: 8px 0 0; font-size: 15px; font-weight: 800; font-variant: small-caps; letter-spacing: 0.02em; }
+    .up .lv { font-size: 12px; font-variant: small-caps; color: #b4b4bd; }
+    .up .val { margin: 8px 0 6px; font-size: 38px; font-weight: 900; line-height: 1; }
+    .up .bar { position: relative; height: 5px; margin: 0 10px 2px; background: #2b2b31; border-radius: 9px; }
+    .up .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: #ffb800; border-radius: 9px; }
+    .up .bar em { position: absolute; right: 0; top: -17px; font-style: normal; font-size: 12px; font-weight: 800; color: #cfcfd6; }
+    .up .buy { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; margin-top: 10px; border: 0; background: #54545b; font-size: 20px; font-weight: 800; }
+    .up .buy svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .up .buy:disabled { background: #34343a; color: #8d8d96; cursor: default; }
+    .up .buy.can { background: linear-gradient(180deg, #ffd43b, #f08c00); color: #1a1200; }
+    .up.maxed .buy { background: #25252a; color: #8d8d96; }
+
+    /* ---- modals ---- */
+    #modals { position: absolute; inset: 0; pointer-events: none; }
+    .modal { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 18px 14px; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(3px); pointer-events: auto; overflow-y: auto; animation: fade 0.25s; }
+    @keyframes fade { from { opacity: 0; } }
+    .modal > :first-child { margin-top: auto; } .modal > :last-child { margin-bottom: auto; } /* centred, but never cut off when tall */
+    .modal h2 { margin: 0 0 6px; text-align: center; font-size: 34px; font-weight: 800; font-variant: small-caps; letter-spacing: 0.02em; }
+    .modal .sub { text-align: center; color: var(--muted); margin: 0 0 14px; }
+    .offers { display: flex; gap: 10px; justify-content: center; margin: 22px 0 10px; }
+    .offer { position: relative; flex: 1 1 0; max-width: 150px; min-height: 250px; padding: 10px 8px 12px; border: 3px solid var(--common); border-radius: 16px; background: #000; display: flex; flex-direction: column; align-items: center; text-align: center; animation: rise 0.45s both; }
+    .offer:nth-child(2) { animation-delay: 0.07s; } .offer:nth-child(3) { animation-delay: 0.14s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(26px) scale(0.96); } }
+    .offer.rare { border-color: var(--rare); box-shadow: 0 0 22px rgba(77, 171, 247, 0.25); }
+    .offer.epic { border-color: var(--epic); box-shadow: 0 0 26px rgba(177, 151, 252, 0.3); }
+    .offer.legendary { border-color: var(--legendary); box-shadow: 0 0 30px rgba(255, 212, 59, 0.35); }
+    .offer .tag { position: absolute; top: -26px; left: 0; right: 0; font-size: 20px; font-style: italic; font-weight: 800; font-variant: small-caps; color: var(--gold); text-shadow: 0 0 14px rgba(255, 212, 59, 0.6); }
+    .offer .tag.up2 { color: #8ce99a; text-shadow: 0 0 14px rgba(140, 233, 154, 0.5); }
+    .offer h3 { margin: 0; font-size: 20px; font-variant: small-caps; }
+    .offer .rar { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    .offer svg { width: 74px; height: 74px; margin: 10px 0; flex: none; }
+    .offer p { margin: auto 0 0; font-size: 12.5px; line-height: 1.35; font-variant: small-caps; font-weight: 700; color: #e5e5ea; }
+    .row { display: flex; gap: 12px; justify-content: center; align-items: flex-start; margin-top: 12px; }
+    .col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; max-width: 200px; font-size: 12px; color: var(--muted); text-align: center; }
+    .col span svg { width: 13px; height: 13px; vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.9; }
+    .btn { width: 100%; min-height: 50px; padding: 8px 14px; border: 3px solid #fff; border-radius: 12px; background: #101013; font-size: 20px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn.green { border-color: #22b422; background: linear-gradient(180deg, #31d431, #1a9a1a); }
+    .btn.gold { border-color: #ffb800; background: linear-gradient(180deg, #ffd43b, #f08c00); color: #1a1200; }
+    .btn.small { min-height: 40px; font-size: 14px; border-width: 2px; }
+    .btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .hint { text-align: center; font-size: 13px; color: #c3c3cc; margin: 6px 0 0; }
+    .hint b { color: var(--gold); }
+
+    .chests { display: flex; gap: 10px; justify-content: center; margin: 22px 0 14px; }
+    .chest { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; max-width: 120px; padding: 14px 6px; border: 2px solid #3a3a42; border-radius: 14px; background: #0c0c0f; text-align: center; font-size: 13px; color: var(--muted); }
+    .chest svg { width: 62px; height: 62px; }
+    .chest.opened { border-color: var(--gold); color: #fff; background: #17130a; }
+    .chest.opened .reward { display: block; margin-top: 4px; font-size: 17px; font-weight: 800; color: var(--gold); }
+    .chest:not(.opened):hover { border-color: var(--gold); }
+
+    .panel { background: #0e0e11; border: 2px solid #26262c; border-radius: 16px; padding: 14px; margin: 0 auto; width: 100%; max-width: 460px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .tabs button { flex: 1; padding: 9px; border: 2px solid #2a2a30; border-radius: 10px; background: none; font-weight: 800; color: var(--muted); }
+    .tabs button[aria-selected="true"] { border-color: var(--gold); color: var(--gold); }
+    .shop { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px; border: 2px solid #2a2a30; border-radius: 12px; background: #09090b; }
+    .item.on { border-color: var(--gold); }
+    .item .sw { width: 46px; height: 46px; border-radius: 50%; }
+    .item b { font-size: 14px; }
+    .item .btn { min-height: 34px; font-size: 13px; border-width: 2px; }
+    .set { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid #1d1d22; }
+    .set:last-child { border: 0; }
+    .toggle { width: 54px; height: 30px; border-radius: 99px; border: 0; background: #34343a; position: relative; }
+    .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+    .toggle[aria-pressed="true"] { background: #f08c00; }
+    .toggle[aria-pressed="true"]::after { transform: translateX(24px); }
+    .close { position: sticky; top: 0; align-self: flex-end; margin: 0 0 -42px !important; z-index: 2; flex: none; width: 42px; height: 42px; border: 0; border-radius: 50%; background: #1b1b20; font-size: 22px; line-height: 1; }
+    .stat-line { display: flex; justify-content: space-between; padding: 7px 0; color: #c9c9d2; }
+
+    /* ---- start screen ---- */
+    #start { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: radial-gradient(circle at 50% 42%, #2b1d00 0%, #000 62%); text-align: center; padding: 24px; }
+    #start h1 { margin: 0; font-size: 46px; font-weight: 900; letter-spacing: -0.02em; background: linear-gradient(110deg, #fff 25%, var(--gold) 45%, var(--gold-2) 55%, #fff 75%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 4s ease-in-out infinite; }
+    @keyframes shine { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
+    #start p { margin: 0; color: #b9b9c2; max-width: 300px; }
+    #start .btn { width: auto; min-width: 200px; }
+    #logoRings { width: 170px; height: 170px; }
+    .toast { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); padding: 9px 16px; border-radius: 99px; background: rgba(255, 212, 59, 0.95); color: #1a1200; font-weight: 800; z-index: 9; pointer-events: none; animation: toast 2.2s both; white-space: nowrap; }
+    @keyframes toast { 0% { opacity: 0; transform: translate(-50%, 10px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; } }
+    @media (max-height: 700px) { .up .val { font-size: 30px; margin: 4px 0; } .up .buy { height: 34px; font-size: 17px; margin-top: 6px; } .offer { min-height: 220px; } .offer svg { width: 58px; height: 58px; } }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="stage" aria-label="Game"></canvas>
+
+    <header id="hud">
+      <div id="xp"><i id="xpFill"></i></div>
+      <div class="hud-row">
+        <div class="stats">
+          <div class="stat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1.4 3h-3.2zM8.5 6.5C5.5 9 4 12 4 15a5 5 0 005 5h6a5 5 0 005-5c0-3-1.500-6-4.500-8.500M12 10v7M14 11.500h-3a1.300 1.300 0 000 2.600h2a1.300 1.300 0 010 2.600h-3"/></svg><b id="cash">0</b></div>
+          <div class="stat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 9-8 9-8-9zM4 12h16M9 3.500L12 12l3-8.500"/></svg><b id="gems">0</b></div>
+          <div class="stat keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M16 16l2.500-2.500M19 19l2-2"/></svg><span>x<b id="keys">0</b></span></div>
+        </div>
+        <div class="center"><small>Stage <span id="stageNo">1</span> progress</small><b id="pct">0%</b></div>
+        <div class="right"><span id="lvl">LVL 1</span><button id="menuBtn" aria-label="Menu"><span></span></button></div>
+      </div>
+    </header>
+
+    <div id="tip"></div>
+    <div id="buffs"></div>
+
+    <section id="bottom">
+      <div id="dps">DPS: 0</div>
+      <div id="slots" aria-label="Your upgrade cards"></div>
+      <div id="slotInfo"></div>
+      <div id="cards"></div>
+    </section>
+
+    <div id="modals"></div>
+
+    <div id="start">
+      <svg id="logoRings" viewBox="-100 -100 200 200" aria-hidden="true">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd43b"/><stop offset="1" stop-color="#f08c00"/></linearGradient></defs>
+        <g fill="none" stroke="url(#g)" stroke-linecap="round">
+          <circle r="22" stroke-width="5" stroke-dasharray="90 18"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="6s" repeatCount="indefinite"/></circle>
+          <circle r="44" stroke-width="5" stroke-dasharray="150 40" opacity=".9"><animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="9s" repeatCount="indefinite"/></circle>
+          <circle r="66" stroke-width="5" stroke-dasharray="230 50" opacity=".75"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="12s" repeatCount="indefinite"/></circle>
+          <circle r="88" stroke-width="5" stroke-dasharray="320 60" opacity=".55"><animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="16s" repeatCount="indefinite"/></circle>
+        </g>
+        <circle r="7" fill="#fff"><animate attributeName="cx" values="-12;10;-6;12;-12" dur="2.4s" repeatCount="indefinite"/><animate attributeName="cy" values="6;-10;12;-4;6" dur="2.4s" repeatCount="indefinite"/></circle>
+      </svg>
+      <h1>Ring Breaker</h1>
+      <p>Your ball breaks the rings by itself. Upgrade it, pick powerful cards and escape every stage.</p>
+      <button class="btn gold" id="playBtn">Play</button>
+    </div>
+  </div>
+
+  <script src="core.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
