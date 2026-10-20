@@ -14,6 +14,7 @@
     THICK: 8, // ring thickness
     BALL_R: 10,
     BASE_SPEED: 300, // world units per second
+    HIT_COOLDOWN: 0.125, // a ball damages the ring at most 8 times a second (bouncing in a tiny space doesn't add more)
     MAX_CARD_LEVEL: 10
   };
 
@@ -43,6 +44,22 @@
 
   Core.ringRadius = function (i) { return Core.R0 + i * Core.SP; };
   Core.arenaRadius = function (i) { return Core.ringRadius(i) - Core.THICK / 2; }; // free space inside ring i
+
+  /* ---------- the closing ring ---------- */
+
+  // The ring being broken closes in on the ball. Break it before it reaches the ball, or the core is
+  // crushed and the stage starts again. Bigger rings and bosses give more time. timeMul comes from cards.
+  Core.ringTime = function (stage, i, timeMul) {
+    var t = 4 + 0.4 * i;
+    if (Core.isBossRing(stage, i)) t *= 1.8;
+    return t * (timeMul || 1);
+  };
+  // Radius of ring i after `frac` (0..1) of its time has passed: it ends just touching the ball.
+  Core.CRUSH_RADIUS = Core.BALL_R + Core.THICK / 2 + 1;
+  Core.closingRadius = function (i, frac) {
+    var r = Core.ringRadius(i);
+    return r - (r - Core.CRUSH_RADIUS) * Math.min(1, Math.max(0, frac));
+  };
 
   /* ---------- upgrades bought with cash ---------- */
 
@@ -99,6 +116,8 @@
       desc: function (l) { return '15% chance to leave a clone that explodes for ' + (5 * (1 + 0.25 * (l - 1))).toFixed(l > 1 ? 2 : 0).replace(/\.?0+$/, '') + '× damage'; } },
     { id: 'lightning', name: 'Lightning', rarity: 'epic', combat: true, max: 10,
       desc: function (l) { return 'Every 5th hit strikes for ' + (4 * (1 + 0.2 * (l - 1))).toFixed(1).replace(/\.0$/, '') + '× damage'; } },
+    { id: 'chrono', name: 'Chrono', rarity: 'rare', combat: false, max: 10,
+      desc: function (l) { return 'Rings close ' + 10 * l + '% slower, giving you more time'; } },
     { id: 'twin', name: 'Twin', rarity: 'legendary', combat: false, max: 3,
       desc: function (l) { return '+' + l + ' extra ball' + (l > 1 ? 's' : ''); } },
     { id: 'finisher', name: 'Finisher', rarity: 'legendary', combat: true, max: 10,
@@ -124,6 +143,7 @@
       bombMul: L('bomb') ? 5 * (1 + 0.25 * (L('bomb') - 1)) : 0,
       lightMul: L('lightning') ? 4 * (1 + 0.2 * (L('lightning') - 1)) : 0,
       finisher: 0.15 * L('finisher'),
+      timeMul: 1 + 0.1 * L('chrono'),
       twin: L('twin')
     };
   };
@@ -162,31 +182,47 @@
   // Returns when each stage was cleared (seconds).
   Core.simulate = function (seconds, opts) {
     opts = opts || {};
-    var s = { cash: 0, stage: 1, ring: 0, hp: Core.ringHp(1, 0), up: { damage: 0, income: 0, speed: 0, balls: 0 } };
-    var t = 0, dt = 0.25, log = [], stageStart = 0;
+    var s = { cash: 0, stage: 1, ring: 0, hp: Core.ringHp(1, 0), t: 0, up: { damage: 0, income: 0, speed: 0, balls: 0 } };
+    var t = 0, dt = 0.1, log = [], stageStart = 0, deaths = 0, stageDeaths = 0, used = 0, usedN = 0;
     var cardMul = opts.cardBoost || 1; // rough stand-in for the cards
+    var closing = opts.closing !== false;
     while (t < seconds) {
-      var maxHp = Core.ringHp(s.stage, s.ring);
-      var R = Core.arenaRadius(s.ring) - Core.BALL_R;
+      var maxHp = Core.ringHp(s.stage, s.ring), limit = Core.ringTime(s.stage, s.ring, opts.timeMul);
+      var R = (closing ? Core.closingRadius(s.ring, s.t / limit) : Core.ringRadius(s.ring)) - Core.THICK / 2 - Core.BALL_R;
+      R = Math.max(R, 2);
       var speed = Core.BASE_SPEED * Core.speedMult(s.up.speed);
-      var hits = (1 + s.up.balls) * (speed / (1.5 * R)) * dt;
+      var hits = (1 + s.up.balls) * Math.min(1 / Core.HIT_COOLDOWN, speed / (1.5 * R)) * dt;
       var dealt = Math.min(s.hp, hits * Core.damage(s.up.damage) * cardMul);
       var reward = Core.ringReward(s.stage, s.ring, s.up.income);
       s.hp -= dealt;
+      s.t += dt;
       s.cash += reward * 0.5 * (dealt / maxHp);
       if (s.hp <= 1e-9) {
         s.cash += reward * 0.5;
+        used += s.t / limit;
+        usedN++;
         s.ring++;
+        s.t = 0;
         if (s.ring >= Core.ringsInStage(s.stage)) {
-          log.push({ stage: s.stage, seconds: Math.round(t - stageStart), t: Math.round(t), dmg: s.up.damage, inc: s.up.income });
+          log.push({ stage: s.stage, seconds: Math.round(t - stageStart), t: Math.round(t), deaths: stageDeaths, used: usedN ? used / usedN : 0, dmg: s.up.damage, inc: s.up.income });
           stageStart = t;
+          stageDeaths = 0;
+          used = 0;
+          usedN = 0;
           s.stage++;
           s.ring = 0;
         }
         s.hp = Core.ringHp(s.stage, s.ring);
+      } else if (closing && s.t >= limit) { // crushed: the stage starts again, cash is kept
+        deaths++;
+        stageDeaths++;
+        s.ring = 0;
+        s.t = 0;
+        s.hp = Core.ringHp(s.stage, 0);
+        t += 3; // the "core destroyed" screen
       }
-      // greedy buying: whichever of damage / income is cheaper
-      for (var guard = 0; guard < 50; guard++) {
+      var buyNow = opts.buyEvery === undefined || (opts.buyEvery > 0 && Math.floor(t / opts.buyEvery) !== Math.floor((t - dt) / opts.buyEvery));
+      for (var guard = 0; buyNow && guard < 50; guard++) {
         var cd = Core.cost.damage(s.up.damage), ci = Core.cost.income(s.up.income);
         if (cd <= ci && s.cash >= cd) { s.cash -= cd; s.up.damage++; }
         else if (ci < cd && s.cash >= ci) { s.cash -= ci; s.up.income++; }
@@ -194,7 +230,7 @@
       }
       t += dt;
     }
-    return { stages: log, state: s };
+    return { stages: log, state: s, deaths: deaths };
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Core;

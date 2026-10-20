@@ -21,7 +21,7 @@
       up: { damage: 0, income: 0, speed: 0, balls: 0 }, cards: {}, order: [],
       theme: 'cyber', skin: 'white', themes: ['cyber', 'gold'], skins: ['white'],
       sound: true, vibrate: true, lastSeen: Date.now(), cps: 0, broken: 0, bestStage: 1,
-      pending: 0, tipSeen: false, seconds: 0, gfx: 'auto', showFps: false
+      pending: 0, tipSeen: false, seconds: 0, gfx: 'auto', showFps: false, deaths: 0, crushTip: false, dev: false
     };
   }
 
@@ -166,7 +166,9 @@
     buy: function () { tone(660, 0.07, 'square', 0.07); tone(990, 0.1, 'square', 0.07, 1, 0.06); },
     nope: function () { tone(160, 0.14, 'square', 0.08, 0.7); },
     level: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.22, 'triangle', 0.12, 1, i * 0.09); }); },
-    pick: function () { tone(784, 0.1, 'triangle', 0.12); tone(1175, 0.2, 'triangle', 0.12, 1, 0.08); }
+    pick: function () { tone(784, 0.1, 'triangle', 0.12); tone(1175, 0.2, 'triangle', 0.12, 1, 0.08); },
+    warn: function (c) { tone(880 + c * 300, 0.07, 'square', 0.05); },
+    crush: function () { noise(0.6, 0.32); tone(220, 0.6, 'sawtooth', 0.18, 0.15); tone(110, 0.8, 'square', 0.1, 0.3, 0.1); }
   };
   function buzz(ms) {
     if (!state.vibrate) return;
@@ -184,13 +186,19 @@
     balls: [], parts: [], texts: [], shocks: [], bombs: [], bolts: [], ghosts: [], stars: [],
     burn: null, burnAcc: 0, burnTextT: 0, hitCount: 0, shake: 0, flash: 0, time: 0,
     started: false, modals: 0, dmgLog: [], cashLog: [], tapCd: 0, intro: 1, streak: 0, lastHit: -9,
-    mods: Core.mods(state.cards), segCache: {}
+    mods: Core.mods(state.cards), segCache: {},
+    ringT: 0, warnT: 0, // time spent on the current ring; when the next warning beep is due
+    dev: { god: false, freeze: false, speed: 1 } // developer options (this session only)
   };
   var canvas = $('stage'), ctx = canvas.getContext('2d');
   var W = 0, H = 0, dpr = 1, CX = 0, CY = 0, SCALE = 1;
 
   function refreshMods() { G.mods = Core.mods(state.cards); }
   function ringMax() { return Core.ringHp(state.stage, state.ring); }
+  function ringLimit() { return Core.ringTime(state.stage, state.ring, G.mods.timeMul); }
+  function closing() { return Math.min(1, G.ringT / ringLimit()); } // 0 = just started, 1 = touching the ball
+  function curRingR() { return Core.closingRadius(state.ring, closing()); }
+  function arenaR() { return curRingR() - Core.THICK / 2; } // free space inside the ring right now
   function ringCount() { return Core.ringsInStage(state.stage); }
   function ballTotal() { return Math.min(8, 1 + state.up.balls + G.mods.twin); }
   function speed() { return Core.BASE_SPEED * Core.speedMult(state.up.speed) * G.mods.speedMul; }
@@ -198,7 +206,7 @@
 
   function resetBalls() {
     G.balls = [];
-    var R = Core.arenaRadius(state.ring) - Core.BALL_R;
+    var R = arenaR() - Core.BALL_R;
     for (var i = 0; i < ballTotal(); i++) addBall(R * 0.5 * Math.random(), Math.random() * TAU);
   }
   function addBall(dist, ang) {
@@ -206,7 +214,7 @@
     G.balls.push({ x: Math.cos(ang) * dist, y: Math.sin(ang) * dist, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, trail: [] });
   }
   function syncBallCount() {
-    var want = ballTotal(), R = Core.arenaRadius(state.ring) - Core.BALL_R;
+    var want = ballTotal(), R = Math.max(4, arenaR() - Core.BALL_R);
     while (G.balls.length < want) addBall(R * 0.4 * Math.random(), Math.random() * TAU);
     while (G.balls.length > want) G.balls.pop();
   }
@@ -285,6 +293,8 @@
 
     G.bombs.length = 0;
     G.burn = null;
+    G.ringT = 0;
+    G.warnT = 0;
     state.ring++;
     if (state.ring >= ringCount()) {
       state.hp = 0;
@@ -320,11 +330,54 @@
       state.bestStage = Math.max(state.bestStage, state.stage);
       state.ring = 0;
       state.hp = ringMax();
+      G.ringT = 0;
       G.intro = 0;
       resetBalls();
       save();
       if (state.pending > 0) showOffers();
     });
+  }
+
+  /* ---- the ring reached the ball ---- */
+
+  function crush() {
+    var reached = state.ring + 1, total = ringCount();
+    G.balls.forEach(function (b) {
+      spark(b.x, b.y, '#ffffff', 26, 1.4);
+      spark(b.x, b.y, '#ff2a4a', 30, 1.1);
+    });
+    G.shocks.push({ r: 10, t: 0, c: '#ff2a4a' });
+    G.balls = [];
+    G.shake = 18;
+    G.flash = 1;
+    G.bombs.length = 0;
+    G.burn = null;
+    sfx.crush();
+    buzz(120);
+    state.deaths++;
+    save();
+    setTimeout(function () {
+      openModal(function (m, h) {
+        var tip = state.crushTip ? 'Upgrade Damage, Ball Speed or Extra Ball, then try again. Chrono cards give you more time.'
+          : 'The ring closed in before it broke. Break each ring before it reaches your core: upgrade Damage, Ball Speed or Extra Ball, then try again. Your cash is kept.';
+        state.crushTip = true;
+        m.innerHTML = '<h2 style="color:#ff5470;text-shadow:0 0 16px #ff2a4a,2px 0 0 rgba(255,63,209,.6),-2px 0 0 rgba(34,228,255,.5)">Core destroyed</h2>' +
+          '<p class="sub">Stage ' + state.stage + ' · reached ring ' + reached + ' of ' + total + '</p>' +
+          '<div class="panel frame" style="text-align:center"><p class="hint" style="margin:0;font-size:13px;line-height:1.5">' + tip + '</p></div>' +
+          '<div class="row"><div class="col"><button class="btn gold" id="retry">↻ Retry stage</button></div></div>';
+        m.querySelector('#retry').onclick = function () {
+          h.close();
+          state.ring = 0;
+          state.hp = ringMax();
+          G.ringT = 0;
+          G.warnT = 0;
+          G.intro = 0;
+          resetBalls();
+          save();
+          if (state.pending > 0) showOffers();
+        };
+      });
+    }, 900);
   }
 
   /* ---- one wall hit ---- */
@@ -333,7 +386,7 @@
     G.hitCount++;
     G.streak = G.time - G.lastHit < 1.2 ? G.streak + 1 : 0;
     G.lastHit = G.time;
-    var m = G.mods, R = Core.arenaRadius(state.ring);
+    var m = G.mods, R = arenaR();
     var px = -nx * R, py = -ny * R;
     var dmg = hitDamage(), kind = 'hit';
     if (m.finisher && state.hp < 0.3 * ringMax()) dmg *= 1 + m.finisher;
@@ -357,7 +410,7 @@
   /* ---- time step ---- */
 
   function step(h) {
-    var sp = speed(), R = Core.arenaRadius(state.ring) - Core.BALL_R;
+    var sp = speed(), R = Math.max(0.5, arenaR() - Core.BALL_R);
     for (var i = 0; i < G.balls.length; i++) {
       var b = G.balls[i];
       var cur = Math.hypot(b.vx, b.vy) || 1;
@@ -375,9 +428,9 @@
           b.vx = vx * c - b.vy * s;
           b.vy = vx * s + b.vy * c;
         }
-        b.x = (b.x / d) * (R - 0.5);
-        b.y = (b.y / d) * (R - 0.5);
-        wallHit(b, nx, ny);
+        b.x = (b.x / d) * Math.max(0, R - 0.5);
+        b.y = (b.y / d) * Math.max(0, R - 0.5);
+        if (G.time - (b.lastHit || -1) >= Core.HIT_COOLDOWN) { b.lastHit = G.time; wallHit(b, nx, ny); }
         if (state.hp <= 0 && !G.balls.length) return;
       }
     }
@@ -393,6 +446,16 @@
     state.seconds += dt;
 
     if (G.started && G.modals === 0) {
+      if (state.hp > 0 && G.balls.length) {
+        if (!G.dev.freeze) G.ringT += dt;
+        if (G.dev.god) G.ringT = Math.min(G.ringT, ringLimit() * 0.97);
+        var c = closing();
+        if (c > 0.7) { // the wall is close: beep faster and faster
+          G.warnT -= dt;
+          if (G.warnT <= 0) { sfx.warn(c); G.warnT = 0.5 - (c - 0.7) * 1.2; }
+        }
+        if (c >= 1) { crush(); return; }
+      }
       var n = Math.max(1, Math.ceil(dt / (1 / 120)));
       for (var i = 0; i < n && state.hp > 0; i++) step(dt / n);
 
@@ -401,7 +464,7 @@
         G.burnAcc += G.burn.dps * dt;
         G.burnTextT += dt;
         if (G.burnTextT >= 0.5 && G.burnAcc > 0) {
-          var a = Math.random() * TAU, R = Core.arenaRadius(state.ring);
+          var a = Math.random() * TAU, R = arenaR();
           var amt = G.burnAcc;
           G.burnAcc = 0;
           G.burnTextT = 0;
@@ -613,28 +676,32 @@
     // the ring being broken
     if (state.ring < n) {
       var cs2 = segments(state.stage, state.ring), crot = G.time * cs2.speed, col = ringColor(state.ring);
+      var cl = closing(), danger = Math.max(0, (cl - 0.5) / 0.5), k = curRingR() / Core.ringRadius(state.ring);
+      if (danger > 0) col = mix(col, '#ff2a4a', Math.min(1, danger * (0.75 + 0.25 * Math.sin(G.time * 18))));
       var alive = Math.max(0, Math.min(1, state.hp / ringMax())), aliveCount = Math.ceil(alive * cs2.length);
       var on = ringPath(state.stage, state.ring, 0, aliveCount), off = ringPath(state.stage, state.ring, aliveCount, cs2.length);
       ctx.save();
       ctx.rotate(crot);
+      ctx.scale(k, k); // the cached shape, shrunk to where the wall is now
+      var lw = 1 / k; // keep line widths the same while it shrinks
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = intro;
       ctx.strokeStyle = 'rgba(120, 140, 175, 0.16)';
-      ctx.lineWidth = Core.THICK * 0.55;
+      ctx.lineWidth = Core.THICK * 0.55 * lw;
       ctx.stroke(off);
       ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = G.burn ? '#ff7a1a' : col;
       if (!Q.low) {
-        ctx.globalAlpha = (0.14 + G.pulse * 0.2) * intro;
-        ctx.lineWidth = Core.THICK * 3;
+        ctx.globalAlpha = (0.14 + G.pulse * 0.2 + danger * 0.15) * intro;
+        ctx.lineWidth = Core.THICK * 3 * lw;
         ctx.stroke(on);
       }
       ctx.globalAlpha = (0.4 + G.pulse * 0.3) * intro;
-      ctx.lineWidth = Core.THICK * 1.5;
+      ctx.lineWidth = Core.THICK * 1.5 * lw;
       ctx.stroke(on);
       ctx.globalAlpha = intro;
       ctx.strokeStyle = mix(col, '#ffffff', 0.55);
-      ctx.lineWidth = Core.THICK * 0.7 + G.pulse * 2;
+      ctx.lineWidth = (Core.THICK * 0.7 + G.pulse * 2) * lw;
       ctx.stroke(on);
       ctx.restore();
 
@@ -642,8 +709,9 @@
       var tk = tickPaths(state.ring);
       ctx.save();
       ctx.rotate(-G.time * 0.25);
+      ctx.scale(k, k);
       ctx.strokeStyle = col;
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 1.4 / k;
       ctx.globalAlpha = 0.55 * intro;
       ctx.stroke(tk.major);
       if (!Q.low) { ctx.globalAlpha = 0.25 * intro; ctx.stroke(tk.minor); }
@@ -711,7 +779,7 @@
     if (state.hp > 0) {
       var boss = Core.isBossRing(state.stage, state.ring), jack = Core.isJackpot(state.stage, state.ring);
       var hpCol = boss ? '#ff3b5c' : jack ? '#ffd43b' : th.a;
-      var gR = Math.max(26, Math.min(48, (Core.arenaRadius(state.ring) - Core.BALL_R) * SCALE * 0.62));
+      var gR = Math.max(22, Math.min(48, (arenaR() - Core.BALL_R) * SCALE * 0.62));
       var frac = state.hp / ringMax();
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'rgba(120, 140, 175, 0.18)';
@@ -719,6 +787,14 @@
       ctx.strokeStyle = hpCol;
       ctx.globalAlpha = 0.85;
       ctx.beginPath(); ctx.arc(0, 0, gR, -Math.PI / 2, -Math.PI / 2 + frac * TAU); ctx.stroke();
+      // time left before the wall reaches the core
+      var left = Math.max(0, ringLimit() - G.ringT), timeFrac = 1 - closing();
+      var tCol = timeFrac < 0.3 ? '#ff2a4a' : timeFrac < 0.55 ? '#ffb02e' : 'rgba(182, 255, 59, 0.85)';
+      ctx.strokeStyle = tCol;
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.arc(0, 0, gR + 6, -Math.PI / 2, -Math.PI / 2 + timeFrac * TAU); ctx.stroke();
+      ctx.lineWidth = 2;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = '700 9px ' + MONO;
@@ -734,6 +810,9 @@
       ctx.globalAlpha = 0.95;
       ctx.fillStyle = '#e8f6ff';
       ctx.fillText(hpText, 0, 3);
+      ctx.font = '700 10px ' + MONO;
+      ctx.fillStyle = tCol;
+      ctx.fillText((G.dev.freeze ? '∞' : left.toFixed(1) + 's'), 0, gR * 0.45);
       ctx.globalAlpha = 1;
     }
     ctx.restore();
@@ -940,10 +1019,12 @@
     setText('keys', String(state.keys));
     setText('lvl', 'LVL ' + state.level);
     setText('stageNo', String(state.stage));
-    var done = (state.ring + (1 - state.hp / ringMax())) / ringCount();
-    setText('pct', Math.min(100, Math.floor(done * 100)) + '%');
+    var done = (state.ring + (1 - Math.min(1, Math.max(0, state.hp / ringMax())))) / ringCount();
+    setText('pct', Math.max(0, Math.min(100, Math.floor(done * 100))) + '%');
     $('xpFill').style.width = Math.min(100, (state.xp / Core.xpNeed(state.level)) * 100) + '%';
     setText('dps', 'DPS: ' + Core.fmt(Math.round(dps() * 10) / 10));
+    var near = G.started && G.modals === 0 && state.hp > 0 && G.balls.length ? Math.max(0, (closing() - 0.65) / 0.35) : 0;
+    $('danger').style.opacity = near ? (0.35 + near * 0.65).toFixed(2) : '0';
     updateCards();
   }
 
@@ -1178,6 +1259,89 @@
     });
   }
 
+  /* ---- developer menu (hidden: tap the LVL badge 7 times) ---- */
+
+  function showDevMenu() {
+    openModal(function (m, h) {
+      function render() {
+        var d = G.dev;
+        var b = function (id, label, on) { return '<button class="btn small' + (on ? ' on' : '') + '" data-dev="' + id + '">' + label + '</button>'; };
+        m.innerHTML = '<button class="close" aria-label="Close">×</button><h2 style="color:var(--pink)">Mod menu</h2>' +
+          '<p class="sub">Developer options · cash ' + Core.fmt(state.cash) + ' · gems ' + Core.fmt(state.gems) + ' · stage ' + state.stage + '</p>' +
+          '<div class="panel frame">' +
+          '<p class="dev-h">Money</p><div class="dev-grid">' + b('c3', '+1K') + b('c6', '+1M') + b('c9', '+1B') + b('c12', '+1T') + b('cx', '×10 cash') + b('g', '+500 gems') + b('k', '+10 keys') + b('xp', 'Level up') + b('cards', 'Max cards') + '</div>' +
+          '<p class="dev-h">Upgrades</p><div class="dev-grid">' + b('ud', 'Damage +10') + b('ui', 'Income +10') + b('us', 'Max speed') + b('ub', 'Max balls') + '</div>' +
+          '<p class="dev-h">Stage</p><div class="dev-grid">' + b('ring', 'Skip ring') + b('stage', 'Clear stage') + b('prev', 'Stage −1') + b('next', 'Stage +1') + '</div>' +
+          '<p class="dev-h">Cheats</p><div class="dev-grid">' + b('god', 'God mode', d.god) + b('freeze', 'Freeze wall', d.freeze) +
+          b('s1', 'Speed 1×', d.speed === 1) + b('s2', 'Speed 2×', d.speed === 2) + b('s5', 'Speed 5×', d.speed === 5) + '</div>' +
+          '<p class="dev-h">Other</p><div class="dev-grid">' + b('hide', 'Hide dev mode') + b('reset', 'Reset all') + '</div>' +
+          '<p class="hint">God mode: the wall never crushes the core. Freeze wall: rings stop closing. Cheats last until the game is closed.</p></div>';
+        m.querySelector('.close').onclick = function () { h.close(); save(); };
+        Array.prototype.forEach.call(m.querySelectorAll('[data-dev]'), function (btn) {
+          btn.onclick = function () { act(btn.dataset.dev); };
+        });
+      }
+      function goStage(n) {
+        state.stage = Math.max(1, n);
+        state.bestStage = Math.max(state.bestStage, state.stage);
+        state.ring = 0;
+        state.hp = ringMax();
+        G.ringT = 0;
+        pathCache = {};
+        tickCache = {};
+        G.segCache = {};
+        G.intro = 0;
+        resetBalls();
+      }
+      function act(id) {
+        var d = G.dev, money = { c3: 1e3, c6: 1e6, c9: 1e9, c12: 1e12 };
+        if (money[id]) state.cash += money[id];
+        else if (id === 'cx') state.cash = Math.max(10, state.cash) * 10;
+        else if (id === 'g') state.gems += 500;
+        else if (id === 'k') state.keys += 10;
+        else if (id === 'xp') { state.pending++; state.level++; }
+        else if (id === 'cards') { Core.CARDS.forEach(function (c) { state.cards[c.id] = c.max; }); state.order = Core.CARDS.slice(0, 6).map(function (c) { return c.id; }); refreshMods(); syncBallCount(); buildSlots(); }
+        else if (id === 'ud') state.up.damage += 10;
+        else if (id === 'ui') state.up.income += 10;
+        else if (id === 'us') state.up.speed = Core.MAX_SPEED_LEVEL;
+        else if (id === 'ub') { state.up.balls = Core.MAX_EXTRA_BALLS; syncBallCount(); }
+        else if (id === 'ring') { if (state.hp > 0) { h.close(); dealDamage(state.hp + 1, 0, 0, 'hit'); return; } }
+        else if (id === 'stage') { h.close(); for (var i = 0; i < 60 && G.modals === 0 && state.hp > 0; i++) dealDamage(state.hp + 1, 0, 0, 'hit'); return; }
+        else if (id === 'prev') goStage(state.stage - 1);
+        else if (id === 'next') goStage(state.stage + 1);
+        else if (id === 'god') d.god = !d.god;
+        else if (id === 'freeze') d.freeze = !d.freeze;
+        else if (id === 's1' || id === 's2' || id === 's5') d.speed = +id.slice(1);
+        else if (id === 'hide') { state.dev = false; d.god = d.freeze = false; d.speed = 1; $('devBtn').hidden = true; h.close(); save(); return; }
+        else if (id === 'reset') {
+          if (window.confirm('Erase all progress and start again?')) { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* nothing stored */ } window.location.reload(); }
+          return;
+        }
+        sfx.buy();
+        save();
+        render();
+        if (id === 'xp' && state.pending > 0) { h.close(); showOffers(); }
+      }
+      render();
+    });
+  }
+
+  var lvlTaps = [];
+  $('lvl').addEventListener('click', function () {
+    var now = Date.now();
+    lvlTaps = lvlTaps.filter(function (t) { return now - t < 3000; });
+    lvlTaps.push(now);
+    if (lvlTaps.length >= 7 && !state.dev) {
+      state.dev = true;
+      lvlTaps = [];
+      $('devBtn').hidden = false;
+      toast('Developer mode on');
+      save();
+    }
+  });
+  $('devBtn').addEventListener('click', function () { if (G.started && G.modals === 0) showDevMenu(); });
+  $('devBtn').hidden = !state.dev;
+
   /* ============================================================
    * Start, loop, input
    * ============================================================ */
@@ -1202,7 +1366,7 @@
   function frame(now) {
     var raw = (now - lastT) / 1000 || 0.016, dt = Math.min(0.05, raw);
     lastT = now;
-    update(dt);
+    update(G.dev.speed > 1 ? Math.min(0.05 * G.dev.speed, dt * G.dev.speed) : dt);
     // Under a menu the game is paused: after the fade-in, stop redrawing it (saves battery).
     modalT = G.modals > 0 ? modalT + dt : 0;
     if (modalT < 0.6) draw();
@@ -1235,7 +1399,7 @@
     G.tapCd = 0.22;
     var r = canvas.getBoundingClientRect();
     var x = (e.clientX - r.left - CX) / SCALE, y = (e.clientY - r.top - CY) / SCALE;
-    var d = Math.hypot(x, y) || 1, R = Core.arenaRadius(state.ring);
+    var d = Math.hypot(x, y) || 1, R = arenaR();
     spark(x, y, '#d0ebff', 6, 0.6);
     G.pulse = 0.7;
     dealDamage(hitDamage() * 2, (x / d) * R, (y / d) * R, 'tap');

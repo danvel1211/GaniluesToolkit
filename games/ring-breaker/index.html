@@ -71,7 +71,7 @@
     .center small b { color: var(--neon); text-shadow: 0 0 8px var(--neon); }
     #pct { display: block; margin-top: 2px; font-size: 24px; font-weight: 800; color: var(--pink); text-shadow: 0 0 12px var(--pink); line-height: 1.1; }
     .right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto; }
-    #lvl { padding: 3px 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; color: var(--neon); border: 1px solid var(--line); background: rgba(34, 228, 255, 0.07); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+    #lvl { cursor: default; padding: 3px 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; color: var(--neon); border: 1px solid var(--line); background: rgba(34, 228, 255, 0.07); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
     #menuBtn { width: 44px; height: 40px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--glass); clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
     #menuBtn span, #menuBtn span::before, #menuBtn span::after { display: block; width: 20px; height: 2px; background: var(--neon); box-shadow: 0 0 6px var(--neon); content: ""; position: relative; }
     #menuBtn span::before { position: absolute; top: -7px; width: 14px; }
@@ -79,6 +79,15 @@
 
     #tip { white-space: pre-line; position: absolute; left: 18px; right: 18px; top: 24%; padding: 10px 12px; text-align: center; color: var(--neon); font: 600 13.5px/1.45 var(--mono); background: rgba(4, 12, 24, 0.7); border: 1px solid var(--line); pointer-events: none; opacity: 0; transition: opacity 0.5s; text-shadow: 0 0 8px rgba(34, 228, 255, 0.5); }
     #tip.show { opacity: 1; }
+    /* red glow at the screen edges when the ring is about to reach the core */
+    #danger { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.12s;
+      background: radial-gradient(ellipse at 50% 42%, transparent 48%, rgba(255, 30, 70, 0.55) 100%); animation: alarm 0.5s ease-in-out infinite alternate; }
+    @keyframes alarm { from { filter: none; } to { filter: none; transform: scale(1.01); } }
+    #devBtn { padding: 4px 8px; border: 1px solid var(--pink); background: rgba(255, 63, 209, 0.12); color: var(--pink); font: 800 11px var(--mono); letter-spacing: 0.14em; }
+    .dev-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 14px; }
+    .dev-grid .btn { min-height: 38px; font-size: 11px; letter-spacing: 0.06em; padding: 4px; }
+    .dev-grid .btn.on { background: rgba(255, 63, 209, 0.2); box-shadow: inset 0 0 0 1px var(--pink); color: var(--pink); }
+    .dev-h { font: 800 11px var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--pink); margin: 4px 0 0; }
     #fps { position: absolute; right: 14px; top: 118px; font: 700 11px var(--mono); color: var(--acid); pointer-events: none; text-shadow: 0 0 6px #000; }
     #buffs { position: absolute; left: 14px; top: 120px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
 
@@ -213,11 +222,12 @@
           <div class="stat keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M16 16l2.500-2.500M19 19l2-2"/></svg><span>x<b id="keys">0</b></span></div>
         </div>
         <div class="center"><small>Stage <b id="stageNo">1</b> // progress</small><b id="pct">0%</b></div>
-        <div class="right"><span id="lvl">LVL 1</span><button id="menuBtn" aria-label="Menu"><span></span></button></div>
+        <div class="right"><span id="lvl">LVL 1</span><button id="menuBtn" aria-label="Menu"><span></span></button><button id="devBtn" hidden>DEV</button></div>
       </div>
     </header>
 
     <div id="tip"></div>
+    <div id="danger" aria-hidden="true"></div>
     <div id="buffs"></div>
     <div id="fps" hidden></div>
 
