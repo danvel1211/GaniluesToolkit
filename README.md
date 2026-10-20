@@ -88,6 +88,7 @@ The script swaps in each edition's name, tagline, logo, favicon and colours, so 
 
 - `core.js` holds the rules and balance (tested with `Core.simulate`), `game.js` the drawing, sound, menus and saving.
 - `python3 tools/build_game.py` builds one self-contained file, `out/Ring-Breaker.html`, that works offline on a phone or PC. Progress is saved in the browser on the device; nothing is sent anywhere.
+- **Android app:** `python3 tools/build_apk.py` builds `out/Ring-Breaker.apk` (about 0.1 MB, Android 7.0 or newer) with no Android Studio: the game page is bundled in a small full-screen WebView app (`games/ring-breaker/android/`). The app has **no internet permission**, only vibration. Build tools are downloaded once from Maven Central into `out/android-tools/`. The first build creates a signing key in `out/ringbreaker.jks` (password in `out/ringbreaker-keystore-password.txt`): **back both up**, because an update must be signed with the same key or phones will refuse to install it over the old version. To install on a phone, copy the `.apk` over, open it, and allow "install unknown apps" for the app you opened it with.
 
 ## Privacy
 

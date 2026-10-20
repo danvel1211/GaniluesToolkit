@@ -159,7 +159,13 @@
     level: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.22, 'triangle', 0.12, 1, i * 0.09); }); },
     pick: function () { tone(784, 0.1, 'triangle', 0.12); tone(1175, 0.2, 'triangle', 0.12, 1, 0.08); }
   };
-  function buzz(ms) { if (state.vibrate && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) { /* not supported */ } } }
+  function buzz(ms) {
+    if (!state.vibrate) return;
+    try {
+      if (window.RBNative && window.RBNative.vibrate) window.RBNative.vibrate(ms); // the Android app
+      else if (navigator.vibrate) navigator.vibrate(ms);
+    } catch (e) { /* not supported */ }
+  }
 
   /* ============================================================
    * Game world
@@ -1023,13 +1029,27 @@
   $('menuBtn').addEventListener('click', function () { if (G.started && G.modals === 0) showMenu(); });
   $('playBtn').addEventListener('click', begin);
   window.addEventListener('resize', resize);
+  var hiddenAt = 0;
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { updateCps(); save(); }
+    if (document.hidden) { hiddenAt = Date.now(); updateCps(); save(); return; }
+    // Back from another app or tab: pay out what the ball earned in the meantime.
+    var secs = hiddenAt ? Math.min((Date.now() - hiddenAt) / 1000, 7200) : 0;
+    hiddenAt = 0;
+    if (G.started && G.modals === 0 && secs >= 90 && state.cps > 0) showWelcomeBack(secs, secs * state.cps * 0.5);
   });
   window.addEventListener('pagehide', function () { updateCps(); save(); });
   window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { var last = $('modals').lastElementChild; var c = last && last.querySelector('.close'); if (c) c.click(); }
   });
+
+  // The Android app calls this for the back button. true = handled here, false = leave the game (it keeps running in the background).
+  window.RBBack = function () {
+    var last = $('modals').lastElementChild;
+    if (!last) return false;
+    var c = last.querySelector('.close');
+    if (c) c.click(); // menus close; offers and chests must be answered, so the button does nothing there
+    return true;
+  };
 
   function updateCps() {
     if (G.time < 20) return;
