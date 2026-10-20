@@ -7,7 +7,9 @@
   var Core = window.RBCore;
   var $ = function (id) { return document.getElementById(id); };
   var SAVE_KEY = 'ringbreaker-save-v1';
+  var OFFLINE_CAP = 4 * 3600; // the ball keeps earning for up to 4 hours while you're away
   var TAU = Math.PI * 2;
+  var MONO = '"SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, ui-monospace, monospace';
 
   /* ============================================================
    * Save data
@@ -15,9 +17,9 @@
 
   function defaults() {
     return {
-      v: 1, cash: 0, gems: 60, keys: 2, xp: 0, level: 1, stage: 1, ring: 0, hp: Core.ringHp(1, 0),
+      v: 2, cash: 25, gems: 60, keys: 2, xp: 0, level: 1, stage: 1, ring: 0, hp: Core.ringHp(1, 0),
       up: { damage: 0, income: 0, speed: 0, balls: 0 }, cards: {}, order: [],
-      theme: 'gold', skin: 'white', themes: ['gold'], skins: ['white'],
+      theme: 'cyber', skin: 'white', themes: ['cyber', 'gold'], skins: ['white'],
       sound: true, vibrate: true, lastSeen: Date.now(), cps: 0, broken: 0, bestStage: 1,
       pending: 0, tipSeen: false, seconds: 0
     };
@@ -31,7 +33,12 @@
       s.up = Object.assign({ damage: 0, income: 0, speed: 0, balls: 0 }, saved.up || {});
       s.cards = saved.cards && typeof saved.cards === 'object' ? saved.cards : {};
       s.order = Array.isArray(saved.order) ? saved.order.filter(function (id) { return Core.card(id); }) : [];
-      s.themes = Array.isArray(saved.themes) ? saved.themes : ['gold'];
+      s.themes = Array.isArray(saved.themes) ? saved.themes : ['cyber', 'gold'];
+      if (!saved.v || saved.v < 2) { // the new look: everyone gets the Cyber colours (Gold stays available)
+        if (s.themes.indexOf('cyber') < 0) s.themes.unshift('cyber');
+        if (s.theme === 'gold') s.theme = 'cyber';
+        s.v = 2;
+      }
       s.skins = Array.isArray(saved.skins) ? saved.skins : ['white'];
     }
     ['cash', 'gems', 'keys', 'xp', 'level', 'stage', 'ring', 'hp'].forEach(function (k) { if (!isFinite(s[k]) || s[k] < 0) s[k] = defaults()[k]; });
@@ -54,8 +61,10 @@
    * ============================================================ */
 
   var THEMES = {
+    cyber: { name: 'Cyber', a: '#22e4ff', b: '#b46bff', cost: 0 },
     gold: { name: 'Gold', a: '#ffd43b', b: '#f08c00', cost: 0 },
-    neon: { name: 'Neon', a: '#39ff14', b: '#00e5ff', cost: 120 },
+    neon: { name: 'Toxic', a: '#b6ff3b', b: '#00e5ff', cost: 120 },
+    synth: { name: 'Synthwave', a: '#ff3fd1', b: '#7a5cff', cost: 180 },
     ice: { name: 'Ice', a: '#e0fbff', b: '#3b82f6', cost: 160 },
     violet: { name: 'Violet', a: '#f3d9fa', b: '#9c36b5', cost: 200 },
     lava: { name: 'Lava', a: '#ffa94d', b: '#e03131', cost: 240 }
@@ -172,7 +181,7 @@
    * ============================================================ */
 
   var G = {
-    balls: [], parts: [], texts: [], shocks: [], bombs: [], bolts: [],
+    balls: [], parts: [], texts: [], shocks: [], bombs: [], bolts: [], ghosts: [], stars: [],
     burn: null, burnAcc: 0, burnTextT: 0, hitCount: 0, shake: 0, flash: 0, time: 0,
     started: false, modals: 0, dmgLog: [], cashLog: [], tapCd: 0, intro: 1, streak: 0, lastHit: -9,
     mods: Core.mods(state.cards), segCache: {}
@@ -223,8 +232,9 @@
   }
 
   function ringColor(i) {
-    var th = THEMES[state.theme] || THEMES.gold;
-    if (Core.isBossRing(state.stage, i)) return mix('#ff8787', '#e03131', 0.5);
+    var th = THEMES[state.theme] || THEMES.cyber;
+    if (Core.isBossRing(state.stage, i)) return '#ff3b5c';
+    if (Core.isJackpot(state.stage, i)) return '#ffd43b';
     return mix(th.a, th.b, Math.min(1, Math.max(0, (i - state.ring) / 10)));
   }
 
@@ -237,7 +247,7 @@
     gainCash(reward * 0.5 * (amount / max));
     G.dmgLog.push({ t: G.time, v: amount });
     if (kind !== 'burn') {
-      var colors = { hit: '#ffffff', crit: '#ffe066', bomb: '#ff922b', bolt: '#74d7ff', tap: '#d0ebff' };
+      var colors = { hit: '#e8f6ff', crit: '#ff3fd1', bomb: '#ff922b', bolt: '#74d7ff', tap: '#b6ff3b' };
       var big = kind === 'crit' || kind === 'bomb' || kind === 'bolt';
       text(x, y, Core.fmt(amount), colors[kind] || '#fff', big ? 21 : 14);
     }
@@ -245,22 +255,28 @@
   }
 
   function breakRing(x, y) {
-    var th = THEMES[state.theme] || THEMES.gold;
+    var th = THEMES[state.theme] || THEMES.cyber;
     var color = ringColor(state.ring);
     var reward = Core.ringReward(state.stage, state.ring, state.up.income) * G.mods.cashMul;
+    var jackpot = Core.isJackpot(state.stage, state.ring);
     gainCash(reward * 0.5);
+    // pop-ups float above the HP gauge in the middle, never on top of it
+    var popY = -Math.max(70, Core.arenaRadius(state.ring) * 0.55);
+    text(0, popY, '+$' + Core.fmt(reward), jackpot ? '#ffd43b' : '#b6ff3b', jackpot ? 26 : 20);
+    if (jackpot) { text(0, popY - 30, 'JACKPOT ×5', '#ffd43b', 22); sfx.coin(); setTimeout(sfx.coin, 140); }
+    G.ghosts.push({ r: Core.ringRadius(state.ring), t: 0 });
     state.xp += Core.xpGain(state.stage, state.ring);
     var boss = Core.isBossRing(state.stage, state.ring);
     var gems = G.mods.gemBonus + (Math.random() < 0.1 ? 1 : 0) + (boss ? 6 : 0);
-    if (gems) { state.gems += gems; text(0, -40, '+' + gems + ' gem' + (gems > 1 ? 's' : ''), '#74f0d0', 17); }
-    if (boss) { state.keys += 1; text(0, -62, '+1 key', '#ffe066', 17); }
+    if (gems) { state.gems += gems; text(0, -Math.max(70, Core.arenaRadius(state.ring) * 0.55) - 56, '+' + gems + ' gem' + (gems > 1 ? 's' : ''), '#c49bff', 16); }
+    if (boss) { state.keys += 1; text(0, -Math.max(70, Core.arenaRadius(state.ring) * 0.55) - 78, '+1 key', '#ffd43b', 16); }
     state.broken++;
 
     G.shocks.push({ r: Core.ringRadius(state.ring), t: 0, c: color });
     for (var i = 0; i < 46; i++) {
       var a = (i / 46) * TAU + Math.random() * 0.2, rr = Core.ringRadius(state.ring);
       var v = 90 + Math.random() * 230;
-      G.parts.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.6 + Math.random() * 0.6, t: 0, c: i % 3 ? color : th.a, r: 1.6 + Math.random() * 3 });
+      G.parts.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.6 + Math.random() * 0.6, t: 0, c: i % 3 ? color : '#ffffff', r: 1.6 + Math.random() * 3, shard: i % 2 === 0 });
     }
     G.shake = boss ? 14 : 7;
     G.flash = 1;
@@ -417,6 +433,8 @@
       if (q.t >= q.life) G.parts.splice(p, 1);
     }
     for (var s2 = G.shocks.length - 1; s2 >= 0; s2--) { G.shocks[s2].t += dt; if (G.shocks[s2].t > 0.7) G.shocks.splice(s2, 1); }
+    for (var g3 = G.ghosts.length - 1; g3 >= 0; g3--) { G.ghosts[g3].t += dt; if (G.ghosts[g3].t > 0.3) G.ghosts.splice(g3, 1); }
+    updateStars(dt);
     for (var s3 = G.bolts.length - 1; s3 >= 0; s3--) { G.bolts[s3].t += dt; if (G.bolts[s3].t > 0.22) G.bolts.splice(s3, 1); }
     for (var t2 = G.texts.length - 1; t2 >= 0; t2--) { G.texts[t2].t += dt; G.texts[t2].y -= 38 * dt; if (G.texts[t2].t > 0.9) G.texts.splice(t2, 1); }
     for (var bi = 0; bi < G.balls.length; bi++) {
@@ -461,23 +479,83 @@
     return list;
   }
 
+  /* ---- background: stars streaming out of the centre, and a faint hex grid ---- */
+
+  function newStar(anywhere) {
+    return { a: Math.random() * TAU, d: anywhere ? Math.random() : 0.02 + Math.random() * 0.05, v: 0.03 + Math.random() * 0.09, z: Math.random() };
+  }
+  function updateStars(dt) {
+    if (!G.stars.length) for (var i = 0; i < 150; i++) G.stars.push(newStar(true));
+    for (var k = 0; k < G.stars.length; k++) {
+      var st = G.stars[k];
+      st.d += st.v * dt * (0.35 + st.d * 1.6);
+      if (st.d > 1.05) G.stars[k] = newStar(false);
+    }
+  }
+
+  var hexPattern = null;
+  function hexes() {
+    if (hexPattern) return hexPattern;
+    var w = 42, h = 72.75, c = document.createElement('canvas');
+    c.width = w * 2;
+    c.height = h;
+    var x = c.getContext('2d');
+    x.strokeStyle = 'rgba(80, 200, 255, 0.07)';
+    x.lineWidth = 1;
+    function hex(cx, cy) {
+      x.beginPath();
+      for (var i = 0; i < 6; i++) {
+        var an = Math.PI / 6 + (i * Math.PI) / 3;
+        x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(an) * 24.25, cy + Math.sin(an) * 24.25);
+      }
+      x.closePath();
+      x.stroke();
+    }
+    hex(w / 2, 0); hex(w / 2 + w, 0); hex(w / 2, h); hex(w / 2 + w, h); hex(w, h / 2); hex(0, h / 2); hex(2 * w, h / 2);
+    hexPattern = ctx.createPattern(c, 'repeat');
+    return hexPattern;
+  }
+
+  function strokeSegs(segs, from, to, r, rot) {
+    for (var s = from; s < to; s++) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r, segs[s].a0 + rot, segs[s].a1 + rot);
+      ctx.stroke();
+    }
+  }
+
   function draw() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, W, H);
-
-    var th = THEMES[state.theme] || THEMES.gold;
+    ctx.globalCompositeOperation = 'source-over';
+    var th = THEMES[state.theme] || THEMES.cyber;
     var sx = (Math.random() - 0.5) * G.shake, sy = (Math.random() - 0.5) * G.shake;
+    var maxR = Math.hypot(W, H) / 2;
 
-    // soft glow behind the arena
-    var glow = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.min(W, 520) * 0.75);
-    glow.addColorStop(0, mix(th.b, '#000000', 0.82));
-    glow.addColorStop(1, '#000');
-    ctx.fillStyle = glow;
-    ctx.globalAlpha = 0.55 + G.flash * 0.35;
+    // deep space
+    var bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, maxR * 1.1);
+    bg.addColorStop(0, mix(th.b, '#02030a', 0.78));
+    bg.addColorStop(0.45, '#04060f');
+    bg.addColorStop(1, '#010207');
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = hexes();
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (var k = 0; k < G.stars.length; k++) {
+      var st = G.stars[k], d = st.d * maxR, len = 2 + st.v * st.d * 60;
+      var x0 = CX + Math.cos(st.a) * d, y0 = CY + Math.sin(st.a) * d;
+      ctx.strokeStyle = st.z > 0.7 ? th.a : st.z > 0.4 ? th.b : '#ffffff';
+      ctx.globalAlpha = Math.min(1, st.d * 2) * (0.25 + st.z * 0.55);
+      ctx.lineWidth = 0.6 + st.z * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x0 - Math.cos(st.a) * len, y0 - Math.sin(st.a) * len);
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
 
     ctx.save();
     ctx.translate(CX + sx, CY + sy);
@@ -486,148 +564,249 @@
 
     var n = ringCount(), limit = Math.hypot(W, H) / SCALE;
     var intro = 1 - Math.pow(1 - G.intro, 3);
+    var last = Math.min(n - 1, state.ring + 22);
 
     // rings from the outside in, so the current ring is drawn on top
-    var last = Math.min(n - 1, state.ring + 22);
     for (var i = last; i >= state.ring; i--) {
       var r = Core.ringRadius(i) * (0.7 + 0.3 * intro);
       if (r > limit) continue;
       var segs = segments(state.stage, i), rot = G.time * segs.speed;
-      var cur = i === state.ring, boss = Core.isBossRing(state.stage, i);
-      var fade = Math.max(0.28, 1 - (i - state.ring) * 0.04) * intro;
+      var cur = i === state.ring;
+      var fade = Math.max(0.22, 1 - (i - state.ring) * 0.045) * intro;
       var col = ringColor(i);
-      var alive = cur ? Math.max(0, Math.min(1, state.hp / ringMax())) : 1;
-      var aliveCount = Math.ceil(alive * segs.length);
 
-      ctx.lineWidth = cur ? Core.THICK + G.pulse * 3 : Core.THICK * 0.55;
-      for (var s = 0; s < segs.length; s++) {
-        var on = s < aliveCount;
-        if (!on) {
-          ctx.strokeStyle = 'rgba(60,60,66,0.55)';
-          ctx.shadowBlur = 0;
-        } else {
-          ctx.strokeStyle = col;
-          ctx.globalAlpha = fade;
-          if (cur) { ctx.shadowColor = G.burn ? '#ff7a1a' : col; ctx.shadowBlur = 14 + G.pulse * 22; } else ctx.shadowBlur = 0;
-        }
-        ctx.beginPath();
-        ctx.arc(0, 0, r, segs[s].a0 + rot, segs[s].a1 + rot);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+      if (!cur) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = fade * 0.18;
+        ctx.lineWidth = Core.THICK * 1.6;
+        strokeSegs(segs, 0, segs.length, r, rot);
+        ctx.globalAlpha = fade * 0.8;
+        ctx.lineWidth = Core.THICK * 0.42;
+        strokeSegs(segs, 0, segs.length, r, rot);
+        ctx.globalCompositeOperation = 'source-over';
+        continue;
       }
-      ctx.shadowBlur = 0;
-      if (boss && cur) {
-        ctx.strokeStyle = 'rgba(255,80,80,0.25)';
-        ctx.lineWidth = 2;
+
+      var alive = Math.max(0, Math.min(1, state.hp / ringMax())), aliveCount = Math.ceil(alive * segs.length);
+      // broken parts
+      ctx.globalAlpha = intro;
+      ctx.strokeStyle = 'rgba(120, 140, 175, 0.16)';
+      ctx.lineWidth = Core.THICK * 0.55;
+      strokeSegs(segs, aliveCount, segs.length, r, rot);
+      // neon glow, then a bright core line
+      ctx.globalCompositeOperation = 'lighter';
+      var glowCol = G.burn ? '#ff7a1a' : col;
+      ctx.strokeStyle = glowCol;
+      ctx.globalAlpha = (0.16 + G.pulse * 0.22) * intro;
+      ctx.lineWidth = Core.THICK * 3.4;
+      strokeSegs(segs, 0, aliveCount, r, rot);
+      ctx.globalAlpha = (0.4 + G.pulse * 0.3) * intro;
+      ctx.lineWidth = Core.THICK * 1.6;
+      strokeSegs(segs, 0, aliveCount, r, rot);
+      ctx.globalAlpha = intro;
+      ctx.strokeStyle = mix(col, '#ffffff', 0.55);
+      ctx.lineWidth = Core.THICK * 0.7 + G.pulse * 2;
+      strokeSegs(segs, 0, aliveCount, r, rot);
+      // tech ticks around the outside, turning the other way
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.4;
+      var trot = -G.time * 0.25;
+      for (var t = 0; t < 72; t++) {
+        var an = (t / 72) * TAU + trot, major = t % 6 === 0;
+        var r0 = r + Core.THICK * 1.3, r1 = r0 + (major ? 7 : 3.5);
+        ctx.globalAlpha = (major ? 0.55 : 0.25) * intro;
         ctx.beginPath();
-        ctx.arc(0, 0, r + 12, 0, TAU);
+        ctx.moveTo(Math.cos(an) * r0, Math.sin(an) * r0);
+        ctx.lineTo(Math.cos(an) * r1, Math.sin(an) * r1);
         ctx.stroke();
       }
+      ctx.globalCompositeOperation = 'source-over';
+      // dotted guide just inside the ring
+      ctx.globalAlpha = 0.28 * intro;
+      ctx.setLineDash([1.5, 7]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, r - Core.THICK * 1.7, -rot * 0.6, -rot * 0.6 + TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
     }
 
+    // glitch echo of a ring that just broke (red and cyan copies, slightly apart)
+    ctx.globalCompositeOperation = 'lighter';
+    G.ghosts.forEach(function (gh) {
+      var k = gh.t / 0.3;
+      ctx.lineWidth = Core.THICK * (1 - k) + 1;
+      ctx.globalAlpha = (1 - k) * 0.85;
+      ctx.strokeStyle = '#ff2a6d';
+      ctx.beginPath(); ctx.arc(4 + k * 6, 0, gh.r + k * 30, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = '#22e4ff';
+      ctx.beginPath(); ctx.arc(-4 - k * 6, 0, gh.r + k * 30, 0, TAU); ctx.stroke();
+    });
+
     // shock waves
-    G.shocks.forEach(function (s) {
-      var k = s.t / (s.small ? 0.4 : 0.7);
-      ctx.strokeStyle = s.c;
-      ctx.globalAlpha = Math.max(0, 1 - k) * 0.8;
-      ctx.lineWidth = 5 * (1 - k) + 1;
+    G.shocks.forEach(function (sw) {
+      var k = sw.t / (sw.small ? 0.4 : 0.7);
+      ctx.strokeStyle = sw.c;
+      ctx.globalAlpha = Math.max(0, 1 - k) * 0.9;
+      ctx.lineWidth = 6 * (1 - k) + 1;
       ctx.beginPath();
-      ctx.arc(s.small ? 0 : 0, 0, s.r + k * (s.small ? 70 : 90), 0, TAU);
+      ctx.arc(0, 0, sw.r + k * (sw.small ? 70 : 110), 0, TAU);
       ctx.stroke();
-      ctx.globalAlpha = 1;
+      if (!sw.small) {
+        ctx.globalAlpha = Math.max(0, 1 - k) * 0.4;
+        ctx.beginPath();
+        ctx.arc(0, 0, sw.r + k * 60, 0, TAU);
+        ctx.stroke();
+      }
     });
 
     // bombs
-    G.bombs.forEach(function (b) {
-      var k = b.t / 1.1, pulse = 1 + Math.sin(b.t * 20) * 0.12 * (1 + k * 2);
-      ctx.fillStyle = 'rgba(255,146,43,' + (0.25 + k * 0.4) + ')';
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, 17 * pulse, 0, TAU);
-      ctx.fill();
-      ctx.fillStyle = '#ffc9a3';
-      ctx.strokeStyle = '#ff7a1a';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, 9 * pulse, 0, TAU);
-      ctx.fill();
-      ctx.stroke();
-    });
-
-    // lightning bolts
-    G.bolts.forEach(function (bl) {
-      ctx.strokeStyle = '#bfefff';
-      ctx.shadowColor = '#4dc9ff';
-      ctx.shadowBlur = 14;
-      ctx.globalAlpha = Math.max(0, 1 - bl.t / 0.22);
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      var steps = 7;
-      for (var i = 1; i <= steps; i++) {
-        var k = i / steps, jx = (Math.sin(bl.seed + i * 12.9898) * 12) * (1 - k * 0.3), jy = (Math.cos(bl.seed + i * 78.233) * 12) * (1 - k * 0.3);
-        ctx.lineTo(bl.x * k + (i === steps ? 0 : jx), bl.y * k + (i === steps ? 0 : jy));
-      }
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+    G.bombs.forEach(function (bm) {
+      var k = bm.t / 1.1, pulse = 1 + Math.sin(bm.t * 20) * 0.12 * (1 + k * 2);
+      ctx.globalAlpha = 0.35 + k * 0.4;
+      ctx.fillStyle = '#ff7a1a';
+      ctx.beginPath(); ctx.arc(bm.x, bm.y, 18 * pulse, 0, TAU); ctx.fill();
       ctx.globalAlpha = 1;
+      ctx.fillStyle = '#ffe0c2';
+      ctx.beginPath(); ctx.arc(bm.x, bm.y, 7 * pulse, 0, TAU); ctx.fill();
     });
 
-    // the ring's HP, in the middle
+    // lightning
+    G.bolts.forEach(function (bl) {
+      ctx.globalAlpha = Math.max(0, 1 - bl.t / 0.22);
+      for (var pass = 0; pass < 2; pass++) {
+        ctx.strokeStyle = pass ? '#ffffff' : '#4dc9ff';
+        ctx.lineWidth = pass ? 1.5 : 6;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        for (var j = 1; j <= 7; j++) {
+          var q = j / 7, jx = Math.sin(bl.seed + j * 12.9898) * 12 * (1 - q * 0.3), jy = Math.cos(bl.seed + j * 78.233) * 12 * (1 - q * 0.3);
+          ctx.lineTo(bl.x * q + (j === 7 ? 0 : jx), bl.y * q + (j === 7 ? 0 : jy));
+        }
+        ctx.stroke();
+      }
+    });
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
+
+    // the ring's HP in the middle, with a gauge around it
     ctx.save();
     ctx.translate(CX + sx, CY + sy);
-    var boss2 = Core.isBossRing(state.stage, state.ring);
-    ctx.font = '800 ' + Math.round(40 + 8 * (1 - Math.min(1, Core.R0 * SCALE / 70))) + 'px "Segoe UI", system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = boss2 ? 'rgba(255,120,120,0.55)' : 'rgba(190,190,200,0.5)';
-    if (state.hp > 0) ctx.fillText(Core.fmt(Math.ceil(state.hp)), 0, 6);
+    if (state.hp > 0) {
+      var boss = Core.isBossRing(state.stage, state.ring), jack = Core.isJackpot(state.stage, state.ring);
+      var hpCol = boss ? '#ff3b5c' : jack ? '#ffd43b' : th.a;
+      var gR = Math.max(26, Math.min(48, (Core.arenaRadius(state.ring) - Core.BALL_R) * SCALE * 0.62));
+      var frac = state.hp / ringMax();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(120, 140, 175, 0.18)';
+      ctx.beginPath(); ctx.arc(0, 0, gR, 0, TAU); ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = hpCol;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath(); ctx.arc(0, 0, gR, -Math.PI / 2, -Math.PI / 2 + frac * TAU); ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '700 9px ' + MONO;
+      ctx.fillStyle = hpCol;
+      ctx.globalAlpha = 0.75;
+      ctx.fillText(boss ? 'BOSS' : jack ? 'JACKPOT ×5' : 'HP', 0, -gR * 0.42);
+      ctx.globalAlpha = 0.9;
+      ctx.font = '800 ' + Math.round(Math.max(18, Math.min(30, gR * 0.62))) + 'px ' + MONO;
+      ctx.fillStyle = '#e8f6ff';
+      ctx.shadowColor = hpCol;
+      ctx.shadowBlur = 12;
+      ctx.fillText(Core.fmt(Math.ceil(state.hp)), 0, 3);
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
 
-    // balls, particles
+    // energy cores (balls) and particles
     ctx.save();
     ctx.translate(CX + sx, CY + sy);
     ctx.scale(SCALE, SCALE);
     var skin = (SKINS[state.skin] || SKINS.white).color;
+    var glowSkin = state.skin === 'white' ? th.a : skin;
+    ctx.globalCompositeOperation = 'lighter';
     G.parts.forEach(function (p) {
       ctx.globalAlpha = Math.max(0, 1 - p.t / p.life);
-      ctx.fillStyle = p.c;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, TAU);
-      ctx.fill();
-    });
-    ctx.globalAlpha = 1;
-    G.balls.forEach(function (b) {
-      for (var i = 0; i < b.trail.length; i += 2) {
-        var k = i / b.trail.length;
-        ctx.globalAlpha = k * 0.35;
-        ctx.fillStyle = skin;
+      if (p.shard) {
+        ctx.strokeStyle = p.c;
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.arc(b.trail[i], b.trail[i + 1], Core.BALL_R * k * 0.9, 0, TAU);
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = p.c;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, TAU);
         ctx.fill();
       }
-      ctx.globalAlpha = 1;
-      ctx.shadowColor = skin;
-      ctx.shadowBlur = 16;
-      ctx.fillStyle = skin;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, Core.BALL_R, 0, TAU);
-      ctx.fill();
-      ctx.shadowBlur = 0;
     });
+    G.balls.forEach(function (b) {
+      // light trail
+      var tr = b.trail;
+      for (var i2 = 2; i2 < tr.length; i2 += 2) {
+        var q2 = i2 / tr.length;
+        ctx.globalAlpha = q2 * 0.55;
+        ctx.strokeStyle = glowSkin;
+        ctx.lineWidth = Core.BALL_R * 1.4 * q2;
+        ctx.beginPath();
+        ctx.moveTo(tr[i2 - 2], tr[i2 - 1]);
+        ctx.lineTo(tr[i2], tr[i2 + 1]);
+        ctx.stroke();
+      }
+      // halo
+      var halo = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, Core.BALL_R * 3.4);
+      halo.addColorStop(0, glowSkin);
+      halo.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(b.x, b.y, Core.BALL_R * 3.4, 0, TAU); ctx.fill();
+    });
+    ctx.globalCompositeOperation = 'source-over';
+    G.balls.forEach(function (b) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = skin;
+      ctx.beginPath(); ctx.arc(b.x, b.y, Core.BALL_R, 0, TAU); ctx.fill();
+      ctx.strokeStyle = glowSkin;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, Core.BALL_R + 3, G.time * 6, G.time * 6 + Math.PI * 1.2); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
     ctx.restore();
+
+    // screen flash when a ring breaks
+    if (G.flash > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = th.a;
+      ctx.globalAlpha = G.flash * 0.12;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
 
     // floating numbers
     ctx.textAlign = 'center';
-    G.texts.forEach(function (t) {
-      ctx.globalAlpha = Math.max(0, 1 - t.t / 0.9);
-      ctx.font = '800 ' + t.z + 'px "Segoe UI", system-ui, sans-serif';
+    ctx.textBaseline = 'alphabetic';
+    G.texts.forEach(function (tx) {
+      ctx.globalAlpha = Math.max(0, 1 - tx.t / 0.9);
+      ctx.font = '800 ' + tx.z + 'px ' + MONO;
       ctx.lineWidth = 4;
-      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-      var x = CX + t.x * SCALE, y = CY + t.y * SCALE;
-      ctx.strokeText(t.s, x, y);
-      ctx.fillStyle = t.c;
-      ctx.fillText(t.s, x, y);
+      ctx.strokeStyle = 'rgba(0, 4, 12, 0.85)';
+      var x = CX + tx.x * SCALE, y = CY + tx.y * SCALE;
+      ctx.strokeText(tx.s, x, y);
+      ctx.fillStyle = tx.c;
+      ctx.shadowColor = tx.c;
+      ctx.shadowBlur = tx.z > 16 ? 10 : 0;
+      ctx.fillText(tx.s, x, y);
+      ctx.shadowBlur = 0;
     });
     ctx.globalAlpha = 1;
   }
@@ -659,7 +838,7 @@
     box.innerHTML = '';
     UPGRADES.forEach(function (u) {
       var el = document.createElement('div');
-      el.className = 'up';
+      el.className = 'up frame';
       el.innerHTML = '<h3>' + u.title + '</h3><div class="lv"></div><div class="val"></div>' +
         '<div class="bar"><i></i>' + (u.x2 ? '<em>x2</em>' : '') + '</div>' +
         '<button class="buy" type="button"><span class="c">' + plainIcon('coin') + '</span><b></b></button>';
@@ -813,7 +992,7 @@
         offers.forEach(function (id) {
           var c = Core.card(id), l = state.cards[id] || 0, o = document.createElement('button');
           o.type = 'button';
-          o.className = 'offer ' + c.rarity;
+          o.className = 'offer frame ' + c.rarity;
           o.innerHTML = '<span class="tag' + (l ? ' up2' : '') + '">' + (l ? 'Lv ' + l + ' → ' + (l + 1) : 'New') + '</span>' +
             '<h3>' + c.name + '</h3><span class="rar">' + RARITY_NAME[c.rarity] + '</span>' + icon(id) + '<p>' + c.desc(l + 1) + '</p>';
           o.onclick = function () { take([id]); };
@@ -888,7 +1067,7 @@
         opened = true;
         var r = Math.random(), label;
         var base = Core.ringReward(stage, Core.ringsInStage(stage) - 1, state.up.income);
-        if (r < 0.55) { var cash = base * (6 + Math.random() * 8); gainCash(cash); label = '+' + Core.fmt(cash) + ' cash'; }
+        if (r < 0.55) { var cash = base * (12 + Math.random() * 16); gainCash(cash); label = '+' + Core.fmt(cash) + ' cash'; }
         else if (r < 0.92) { var g = 15 + stage * 2 + Math.floor(Math.random() * 20); state.gems += g; label = '+' + g + ' gems'; }
         else { state.keys += 2; label = '+2 keys'; }
         sfx.coin();
@@ -909,7 +1088,7 @@
     openModal(function (m, h) {
       var mins = Math.round(secs / 60);
       m.innerHTML = '<h2>Welcome back!</h2><p class="sub">Your ball kept working for ' + (mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : mins + ' min') + '.</p>' +
-        '<div class="panel" style="text-align:center"><div style="font-size:40px;font-weight:900;color:var(--gold)">+' + Core.fmt(amount) + '</div><div class="hint">cash earned while you were away</div></div>' +
+        '<div class="panel frame" style="text-align:center"><div class="big-num">+$' + Core.fmt(amount) + '</div><div class="hint">earned by your core while you were away</div></div>' +
         '<div class="row"><div class="col"><button class="btn gold" id="collect">Collect</button></div></div>';
       m.querySelector('#collect').onclick = function () { gainCash(amount); sfx.coin(); h.close(); save(); };
     });
@@ -947,7 +1126,7 @@
             ['Cards owned', state.order.length + ' / 10'], ['Time played', mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : mins + ' min']]
             .map(function (r) { return '<div class="stat-line"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
         }
-        m.innerHTML = '<button class="close" aria-label="Close">×</button><h2>Menu</h2><div class="panel"><div class="tabs" role="tablist">' +
+        m.innerHTML = '<button class="close" aria-label="Close">×</button><h2>Menu</h2><div class="panel frame"><div class="tabs" role="tablist">' +
           ['shop', 'settings', 'stats'].map(function (t) { return '<button role="tab" data-tab="' + t + '" aria-selected="' + (tab === t) + '">' + t[0].toUpperCase() + t.slice(1) + '</button>'; }).join('') +
           '</div>' + body + '</div>';
         m.querySelector('.close').onclick = function () { h.close(); save(); };
@@ -994,8 +1173,8 @@
     audio();
     resetBalls();
     G.intro = 0;
-    var secs = Math.min((Date.now() - state.lastSeen) / 1000, 7200);
-    if (secs >= 90 && state.cps > 0) showWelcomeBack(secs, secs * state.cps * 0.5);
+    var secs = Math.min((Date.now() - state.lastSeen) / 1000, OFFLINE_CAP);
+    if (secs >= 90 && state.cps > 0) showWelcomeBack(secs, secs * state.cps);
     if (!state.tipSeen) {
       showTip('Your ball breaks the rings by itself.\nUpgrade Damage to break them faster!');
       setTimeout(function () { showTip(''); }, 9000);
@@ -1033,9 +1212,9 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hiddenAt = Date.now(); updateCps(); save(); return; }
     // Back from another app or tab: pay out what the ball earned in the meantime.
-    var secs = hiddenAt ? Math.min((Date.now() - hiddenAt) / 1000, 7200) : 0;
+    var secs = hiddenAt ? Math.min((Date.now() - hiddenAt) / 1000, OFFLINE_CAP) : 0;
     hiddenAt = 0;
-    if (G.started && G.modals === 0 && secs >= 90 && state.cps > 0) showWelcomeBack(secs, secs * state.cps * 0.5);
+    if (G.started && G.modals === 0 && secs >= 90 && state.cps > 0) showWelcomeBack(secs, secs * state.cps);
   });
   window.addEventListener('pagehide', function () { updateCps(); save(); });
   window.addEventListener('keydown', function (e) {

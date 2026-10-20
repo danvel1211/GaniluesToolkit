@@ -62,9 +62,17 @@
     balls: function (n) { return Math.ceil(400 * Math.pow(9, n)); }
   };
 
+  // About 1 ring in 12 is a gold Jackpot ring worth 5× cash (never the first ring or a boss).
+  // Decided by the stage and ring number, so it stays the same after reloading.
+  Core.isJackpot = function (stage, i) {
+    if (i === 0 || Core.isBossRing(stage, i)) return false;
+    var h = Math.imul(stage * 7919 + i * 104729, 2654435761) >>> 0;
+    return (h % 1000) < 85;
+  };
+
   // Cash for breaking a ring (half is paid out as the ring is damaged, half when it breaks).
   Core.ringReward = function (stage, i, incomeLevel) {
-    return Core.ringHp(stage, i) * 0.5 * Core.income(incomeLevel);
+    return Core.ringHp(stage, i) * 1.5 * Core.income(incomeLevel) * (Core.isJackpot(stage, i) ? 5 : 1);
   };
 
   Core.xpNeed = function (level) { return Math.round(25 * Math.pow(1.45, level - 1)); };
